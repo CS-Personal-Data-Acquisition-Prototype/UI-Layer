@@ -78,8 +78,6 @@ impl Login {
 }
 
 impl eframe::App for Login {
-    //TODO: fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
-
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         eframe::egui::Window::new("Login Manager").show(ctx, |ui| {
             if !self.logged_in {
@@ -89,4 +87,9 @@ impl eframe::App for Login {
             }
         });
     }
+
+    // TODO:
+    // Make a session manager window that's hidden by default.
+    // Have main.rs open it on launch
+    // Hide/Show it by logging in / out with the login manager window.
 }
