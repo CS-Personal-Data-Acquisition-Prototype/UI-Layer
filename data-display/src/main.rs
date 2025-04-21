@@ -1,11 +1,9 @@
-mod app;
-mod login;
+mod display;
 
 const CANVAS_ID: &str = "canvasId";
 
 fn main() {
-    use app::DisplayApp;
-    use login::Login;
+    use display::DisplayApp;
     use wasm_bindgen::JsCast as _;
 
     //redirect log messages to console.log
@@ -27,7 +25,7 @@ fn main() {
             .start(
                 canvas,
                 eframe::WebOptions::default(),
-                Box::new(|cc| Ok(Box::new(Login::new(cc)))),
+                Box::new(|cc| Ok(Box::new(DisplayApp::new(cc)))),
             )
             .await;
 

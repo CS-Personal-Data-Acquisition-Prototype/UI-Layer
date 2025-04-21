@@ -1,8 +1,13 @@
+mod account;
+mod device;
+mod login;
+mod sessions;
+
 use eframe::egui::{self, Color32, RichText};
 
 #[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)]
-pub struct Login {
+#[serde(default)] // <- we don't need this because we're not saving states?
+pub struct DisplayApp {
     /* This how you opt-out of serialization of a field
     #[serde(skip)]
     value: f32*/
@@ -10,12 +15,15 @@ pub struct Login {
     // login_token: String,
     logged_in: bool,
     failed_attempts: u8,
+
+    window_login: login::LoginDisplay<'a>,
+
     show_window_sessionhist: bool,
     show_window_account: bool,
     show_window_deviceinfo: bool,
 }
 
-impl Default for Login {
+impl Default for DisplayApp {
     fn default() -> Self {
         Self {
             logged_in: false,
@@ -27,7 +35,7 @@ impl Default for Login {
     }
 }
 
-impl Login {
+impl DisplayApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
@@ -39,57 +47,6 @@ impl Login {
         //TODO: Load previous app state if any (must enable the `persistence` feature)
 
         Default::default()
-    }
-
-    fn login(&mut self) {
-        // Verify With Server...
-
-        // If successful, show sessions window and set fail count to 0
-        self.logged_in = true;
-        self.show_window_sessionhist = true;
-        self.show_window_account = true;
-        self.show_window_deviceinfo = true;
-
-        // If fail, increment fail count
-    }
-
-    fn logout(&mut self) {
-        // Clear stored user and hide sessions window (should sessions window cascade?)
-        self.logged_in = false;
-        self.show_window_sessionhist = false;
-        self.show_window_account = false;
-        self.show_window_deviceinfo = false;
-    }
-
-    fn show_login_entry(&mut self, ui: &mut eframe::egui::Ui) {
-        let mut username_str: String = String::from("");
-        let mut passwd_str: String = String::from("");
-
-        let username_widget = eframe::egui::TextEdit::singleline(&mut username_str);
-        let passwd_widget = eframe::egui::TextEdit::singleline(&mut passwd_str);
-
-        let login_btn = eframe::egui::Button::new("Login");
-
-        // TODO: Show failed login attempt
-
-        ui.label("Username:");
-        ui.add(username_widget);
-
-        ui.label("Password:");
-        ui.add(passwd_widget);
-
-        if ui.add(login_btn).clicked() {
-            Login::login(self);
-        }
-    }
-
-    fn show_logged_in(&mut self, ui: &mut eframe::egui::Ui) {
-        let logout_btn = eframe::egui::Button::new("Logout");
-
-        ui.label("Logged in as: PLACEHOLDER");
-        if ui.add(logout_btn).clicked() {
-            Login::logout(self);
-        }
     }
 
     fn show_session_history(&mut self, ui: &mut eframe::egui::Ui) {
@@ -155,7 +112,7 @@ impl Login {
     }
 }
 
-impl eframe::App for Login {
+impl eframe::App for DisplayApp {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.vertical_centered(|ui| {
@@ -176,27 +133,27 @@ impl eframe::App for Login {
 
         eframe::egui::Window::new("Login Manager").show(ctx, |ui| {
             if !self.logged_in {
-                Login::show_login_entry(self, ui);
+                DisplayApp::show_login_entry(self, ui);
             } else {
-                Login::show_logged_in(self, ui);
+                DisplayApp::show_logged_in(self, ui);
             }
         });
 
         if self.show_window_sessionhist {
             eframe::egui::Window::new("Sessions").show(ctx, |ui| {
-                Login::show_session_history(self, ui);
+                DisplayApp::show_session_history(self, ui);
             });
         }
 
         if self.show_window_sessionhist {
             eframe::egui::Window::new("Account").show(ctx, |ui| {
-                Login::show_account_info(self, ui);
+                DisplayApp::show_account_info(self, ui);
             });
         }
 
         if self.show_window_sessionhist {
             eframe::egui::Window::new("Device").show(ctx, |ui| {
-                Login::show_device_info(self, ui);
+                DisplayApp::show_device_info(self, ui);
             });
         }
     }

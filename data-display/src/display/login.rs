@@ -1,5 +1,7 @@
 use eframe::egui::Ui;
 
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(default)]
 pub struct LoginDisplay<'a> {
     logged_in: &'a mut bool, // Receive a mutable reference to a global logged_in var
     show_window: bool,
