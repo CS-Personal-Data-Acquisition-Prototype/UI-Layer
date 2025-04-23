@@ -1,15 +1,13 @@
 use eframe::egui::Ui;
 
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)]
-pub struct LoginDisplay<'a> {
-    logged_in: &'a mut bool, // Receive a mutable reference to a global logged_in var
+pub struct LoginDisplay {
+    logged_in: *mut bool, // Receive a mutable reference to a global logged_in var
     show_window: bool,
     failed_attempts: u8,
 }
 
-impl<'a> LoginDisplay<'a> {
-    pub fn new(logged_in: &'a mut bool) -> Self {
+impl LoginDisplay {
+    pub fn new(logged_in: *mut bool) -> Self {
         LoginDisplay {
             logged_in: logged_in,
             show_window: false,
@@ -23,14 +21,18 @@ impl<'a> LoginDisplay<'a> {
         // Verify With Server...
 
         // If successful, show sessions window and set fail count to 0
-        *self.logged_in = false;
+        unsafe {
+            *self.logged_in = false;
+        }
 
         // If fail, increment fail count
     }
 
     fn logout(&mut self) {
         // Clear stored user and hide sessions window (should sessions window cascade?)
-        *self.logged_in = false;
+        unsafe {
+            *self.logged_in = false;
+        }
     }
 
     fn show_login_entry(&mut self, ui: &mut eframe::egui::Ui) {

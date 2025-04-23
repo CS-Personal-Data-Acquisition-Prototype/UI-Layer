@@ -5,18 +5,15 @@ mod sessions;
 
 use eframe::egui::{self, Color32, RichText};
 
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // <- we don't need this because we're not saving states?
 pub struct DisplayApp {
     /* This how you opt-out of serialization of a field
     #[serde(skip)]
     value: f32*/
     // login_name: String, // Usage unimplemented, these are ideas for what to use...
     // login_token: String,
-    logged_in: bool,
-    failed_attempts: u8,
+    logged_in: Box<bool>,
 
-    window_login: login::LoginDisplay<'a>,
+    window_login: login::LoginDisplay,
 
     show_window_sessionhist: bool,
     show_window_account: bool,
@@ -25,9 +22,17 @@ pub struct DisplayApp {
 
 impl Default for DisplayApp {
     fn default() -> Self {
+        // This allocates a box and unwraps the heap pointer
+        let logged_in_ptr: *mut bool = Box::into_raw(Box::new(false));
+
         Self {
-            logged_in: false,
-            failed_attempts: 0,
+            // This puts the box back together to avoid a leak
+            logged_in: unsafe { Box::from_raw(logged_in_ptr) },
+
+            // Declare windows we will draw and provide pointers to shared resources
+            window_login: login::LoginDisplay::new(logged_in_ptr),
+
+            // These are going to disappear
             show_window_sessionhist: false,
             show_window_account: false,
             show_window_deviceinfo: false,
