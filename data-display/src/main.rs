@@ -1,7 +1,10 @@
+//! \<CRATE DESCRIPTION HERE>
+
 mod display;
 
 const CANVAS_ID: &str = "canvasId";
 
+/// Constructs a window for our app to reside in and loads the display module into it.
 fn main() {
     use display::DisplayApp;
     use wasm_bindgen::JsCast as _;

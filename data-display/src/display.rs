@@ -1,3 +1,8 @@
+//! The display manager for the codebase
+//!
+//! The listed modules are each responsible for a designated section, including: a window, functionalities, and popups for those functionalities.
+//!
+
 mod account;
 mod device;
 mod login;
@@ -5,6 +10,7 @@ mod sessions;
 
 use eframe::egui;
 
+/// Container for all window-controlling structs. Manages shared resources and calls draw() functions.
 pub struct DisplayApp {
     logged_in: Box<bool>,
 
@@ -44,7 +50,7 @@ impl DisplayApp {
         Default::default()
     }
 
-    // Helper function to draw the top EGUI Bar
+    /// Helper function to draw the top EGUI Bar
     fn draw_top_bar(ctx: &egui::Context) -> () {
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.vertical_centered(|ui| {
@@ -55,7 +61,7 @@ impl DisplayApp {
         });
     }
 
-    // Helper function to daw the bottom EGUI Bar
+    /// Helper function to daw the bottom EGUI Bar
     fn draw_bottom_bar(ctx: &egui::Context) -> () {
         egui::TopBottomPanel::bottom("bottom_bar").show(ctx, |ui| {
             ui.label(
@@ -68,9 +74,7 @@ impl DisplayApp {
     }
 }
 
-/**
- * This Implementation initiates the draw step for everything in the app.
- */
+/// This Implementation initiates the draw step for everything in the app.
 impl eframe::App for DisplayApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Draw the top bar

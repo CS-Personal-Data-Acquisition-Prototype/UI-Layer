@@ -1,5 +1,11 @@
+//! Data recording session manager
+//!
+
 use eframe::egui::RichText;
 
+/// Handles displaying and managing historcal data recording sessions and
+///     initiates the recording of new data sessions.
+///
 pub struct SessionDisplay {
     _account_id: String, // Example
 }
@@ -11,7 +17,8 @@ impl SessionDisplay {
         }
     }
 
-    fn show_session_history(&mut self, ui: &mut eframe::egui::Ui) -> () {
+    /// Helper function to assign window contents
+    fn show_session_data(&mut self, ui: &mut eframe::egui::Ui) -> () {
         if ui.button("New Session").clicked() {}
         eframe::egui::Grid::new("session_history_grid").show(ui, |ui| {
             ui.label(RichText::new("Timestamp").strong());
@@ -28,9 +35,10 @@ impl SessionDisplay {
         });
     }
 
+    /// Performs the draw step for the sessions window
     pub fn draw(&mut self, ctx: &eframe::egui::Context) -> () {
         eframe::egui::Window::new("Sessions").show(ctx, |ui| {
-            self.show_session_history(ui);
+            self.show_session_data(ui);
         });
     }
 }

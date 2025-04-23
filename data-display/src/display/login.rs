@@ -1,8 +1,17 @@
-pub struct LoginDisplay {
-    logged_in: *mut bool, // Receive a mutable reference to a global logged_in var
-    _failed_attempts: u8,
+//! The login manager
 
+/// Handles drawing the login window and facilitates authentication with the backend api.
+pub struct LoginDisplay {
+    /// Pointer received at creation from the display manager to control
+    ///     window drawing based on login state.
+    logged_in: *mut bool,
+
+    /// Tracker for failed login attempts
+    _failed_attempts: u8, // unimplemented
+
+    /// Username field passed into a widget
     username_str: String,
+    /// Password field passed into a widget
     password_str: String,
 }
 
@@ -17,10 +26,17 @@ impl LoginDisplay {
         }
     }
 
+    /// Wrapper for the unsafe operation to dereference the self.logged_in property
     fn get_logged_in(&self) -> bool {
         return unsafe { *self.logged_in };
     }
 
+    /// Attempt to authenticate with the server.
+    ///
+    /// If successful, notify the rest of the client to update and
+    ///     enable drawing of other windows.
+    ///
+    /// If failed, noify user and track number of failed attempts.
     fn login(&mut self) -> () {
         // Verify With Server...
 
@@ -32,6 +48,7 @@ impl LoginDisplay {
         // If fail, increment fail count
     }
 
+    /// Clear the client state and disable drawing of other windows
     fn logout(&mut self) -> () {
         // Clear stored user and hide sessions window (should sessions window cascade?)
         unsafe {
@@ -39,16 +56,7 @@ impl LoginDisplay {
         }
     }
 
-    pub fn draw(&mut self, ctx: &eframe::egui::Context) -> () {
-        eframe::egui::Window::new("Login Manager").show(ctx, |ui| {
-            if !self.get_logged_in() {
-                self.show_login_entry(ui);
-            } else {
-                self.show_logged_in(ui);
-            }
-        });
-    }
-
+    /// Helper function to draw window contents when we are not logged in
     fn show_login_entry(&mut self, ui: &mut eframe::egui::Ui) {
         let username_widget = eframe::egui::TextEdit::singleline(&mut self.username_str);
         let passwd_widget = eframe::egui::TextEdit::singleline(&mut self.password_str);
@@ -68,6 +76,7 @@ impl LoginDisplay {
         }
     }
 
+    /// Helper function to draw window contents when we are logged in
     fn show_logged_in(&mut self, ui: &mut eframe::egui::Ui) {
         let logout_btn = eframe::egui::Button::new("Logout");
 
@@ -75,5 +84,16 @@ impl LoginDisplay {
         if ui.add(logout_btn).clicked() {
             self.logout();
         }
+    }
+
+    /// Performs the draw step for the login window
+    pub fn draw(&mut self, ctx: &eframe::egui::Context) -> () {
+        eframe::egui::Window::new("Login Manager").show(ctx, |ui| {
+            if !self.get_logged_in() {
+                self.show_login_entry(ui);
+            } else {
+                self.show_logged_in(ui);
+            }
+        });
     }
 }

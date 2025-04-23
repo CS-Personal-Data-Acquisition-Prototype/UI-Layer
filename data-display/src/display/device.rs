@@ -1,5 +1,12 @@
+//! Device status display and connection settings
+//!
+
 use eframe::egui::{Color32, RichText};
 
+/// Displays information about the device and the properties of the connection
+///     made to the device.
+/// It also provides a connection settings panel.
+///
 pub struct DeviceDisplay {
     _account_id: String, // Example
 }
@@ -11,6 +18,7 @@ impl DeviceDisplay {
         }
     }
 
+    /// Helper function to assign contents for the device window
     fn show_device_info(&mut self, ui: &mut eframe::egui::Ui) -> () {
         // Connection Info Section
         ui.label(RichText::new("Connection").heading().underline());
@@ -43,6 +51,7 @@ impl DeviceDisplay {
         });
     }
 
+    /// Performs the draw step for the device window
     pub fn draw(&mut self, ctx: &eframe::egui::Context) -> () {
         eframe::egui::Window::new("Device").show(ctx, |ui| {
             self.show_device_info(ui);
