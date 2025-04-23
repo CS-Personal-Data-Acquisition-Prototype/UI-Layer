@@ -136,13 +136,14 @@ impl eframe::App for DisplayApp {
             );
         });
 
-        eframe::egui::Window::new("Login Manager").show(ctx, |ui| {
-            if !self.logged_in {
-                DisplayApp::show_login_entry(self, ui);
-            } else {
-                DisplayApp::show_logged_in(self, ui);
-            }
-        });
+        self.window_login.draw(ctx);
+        // eframe::egui::Window::new("Login Manager").show(ctx, |ui| {
+        //     if !self.logged_in {
+        //         DisplayApp::show_login_entry(self, ui);
+        //     } else {
+        //         DisplayApp::show_logged_in(self, ui);
+        //     }
+        // });
 
         if self.show_window_sessionhist {
             eframe::egui::Window::new("Sessions").show(ctx, |ui| {

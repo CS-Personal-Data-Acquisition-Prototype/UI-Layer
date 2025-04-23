@@ -1,5 +1,3 @@
-use eframe::egui::Ui;
-
 pub struct LoginDisplay {
     logged_in: *mut bool, // Receive a mutable reference to a global logged_in var
     show_window: bool,
@@ -15,24 +13,36 @@ impl LoginDisplay {
         }
     }
 
-    pub fn draw(&mut self, Ui: Ui) -> () {}
+    fn get_logged_in(&self) -> bool {
+        return unsafe { *self.logged_in };
+    }
 
-    fn login(&mut self) {
+    fn login(&mut self) -> () {
         // Verify With Server...
 
         // If successful, show sessions window and set fail count to 0
         unsafe {
-            *self.logged_in = false;
+            *self.logged_in = true;
         }
 
         // If fail, increment fail count
     }
 
-    fn logout(&mut self) {
+    fn logout(&mut self) -> () {
         // Clear stored user and hide sessions window (should sessions window cascade?)
         unsafe {
             *self.logged_in = false;
         }
+    }
+
+    pub fn draw(&mut self, ctx: &eframe::egui::Context) -> () {
+        eframe::egui::Window::new("Login Manager").show(ctx, |ui| {
+            if !self.get_logged_in() {
+                self.show_login_entry(ui);
+            } else {
+                self.show_logged_in(ui);
+            }
+        });
     }
 
     fn show_login_entry(&mut self, ui: &mut eframe::egui::Ui) {
