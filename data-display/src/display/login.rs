@@ -1,15 +1,19 @@
 pub struct LoginDisplay {
     logged_in: *mut bool, // Receive a mutable reference to a global logged_in var
-    show_window: bool,
-    failed_attempts: u8,
+    _failed_attempts: u8,
+
+    username_str: String,
+    password_str: String,
 }
 
 impl LoginDisplay {
     pub fn new(logged_in: *mut bool) -> Self {
         LoginDisplay {
             logged_in: logged_in,
-            show_window: false,
-            failed_attempts: 0,
+            _failed_attempts: 0,
+
+            username_str: String::from(""),
+            password_str: String::from(""),
         }
     }
 
@@ -46,11 +50,8 @@ impl LoginDisplay {
     }
 
     fn show_login_entry(&mut self, ui: &mut eframe::egui::Ui) {
-        let mut username_str: String = String::from("");
-        let mut passwd_str: String = String::from("");
-
-        let username_widget = eframe::egui::TextEdit::singleline(&mut username_str);
-        let passwd_widget = eframe::egui::TextEdit::singleline(&mut passwd_str);
+        let username_widget = eframe::egui::TextEdit::singleline(&mut self.username_str);
+        let passwd_widget = eframe::egui::TextEdit::singleline(&mut self.password_str);
 
         let login_btn = eframe::egui::Button::new("Login");
 
