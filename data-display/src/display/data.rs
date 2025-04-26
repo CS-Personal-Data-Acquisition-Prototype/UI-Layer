@@ -1,3 +1,6 @@
+//! Main data display window
+//!
+
 use eframe::egui::{CentralPanel, ComboBox, TopBottomPanel, Frame};
 use egui_extras::{TableBuilder, Column};
 use egui_plot::{Plot, Line, PlotPoints, Legend};
@@ -5,6 +8,7 @@ use serde::Deserialize;
 use std::io::Cursor;
 use csv::ReaderBuilder;
 
+/// Row object for csv data (likely to change when connected to backend)
 #[derive(Deserialize)]
 pub struct Row {
     id: u32,
@@ -24,12 +28,14 @@ pub struct Row {
     dac_4: f64,
 }
 
+/// Theme dropdown/toggle
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Theme {
     LightMode,
     DarkMode
 }
 
+/// Data type dropdown
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Selection {
     SensorData,
@@ -37,6 +43,7 @@ pub enum Selection {
     AccelData
 }
 
+/// Display type dropdown
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DisplayType {
     All,
@@ -45,6 +52,7 @@ pub enum DisplayType {
     Map
 }
 
+/// Main window for data display. Has top bar with dropdown selectors, table view, and graphiical view.
 pub struct DataWindow {
     table_headers: Vec<String>,
     table_data: Vec<Row>,
@@ -63,12 +71,12 @@ impl Default for DataWindow {
             display_dropdown: DisplayType::All
         }
     }
-    
 }
 
 impl DataWindow {
     pub fn new() -> Self {
 
+        // Data input section (will change when connected to server)
         let csv_data = include_str!("../../temp_data/mockdata.csv");
         
         let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(Cursor::new(csv_data));
@@ -78,6 +86,7 @@ impl DataWindow {
         let mut data: Vec<Row> = Vec::new();
         let mut headers: Vec<String> = Vec::new();
         
+        // Put data and headers into vectors
         for result in rdr.deserialize() {
             match result {
                 Ok(row) => data.push(row),
@@ -89,6 +98,7 @@ impl DataWindow {
             headers.push(h.to_string());
         }
 
+        // Initialize
         DataWindow {
             table_headers: headers,
             table_data: data,
@@ -101,6 +111,8 @@ impl DataWindow {
 
     pub fn draw(&mut self, ctx: &eframe::egui::Context) -> () {
         eframe::egui::Window::new("Data Window").show(ctx, |_ui| {
+
+            // Set visuals based on theme
             match self.theme_dropdown {
                 Theme::LightMode => {
                     ctx.set_visuals(egui::Visuals::light());
@@ -110,6 +122,7 @@ impl DataWindow {
                 }
             }
         
+            // Dropdown pannel setup
             TopBottomPanel::top("top").show(ctx, |ui| {
                 Frame::none()
                     .fill(egui::Color32::LIGHT_GRAY)
@@ -158,6 +171,7 @@ impl DataWindow {
                     })
             });
         
+            // Main window setup
             CentralPanel::default().show(ctx, |ui| {
                 let mut show_table = true;
                 let mut show_graph = true;
@@ -166,6 +180,8 @@ impl DataWindow {
                 Frame::none()
                     .outer_margin(egui::Margin::symmetric(10.0, 10.0))
                     .show(ui, |ui| {
+
+                        // Display type selection. Different data types will have different options available
                         match self.display_dropdown {
                             DisplayType::All => {
                                 show_table = true;
@@ -189,10 +205,10 @@ impl DataWindow {
                             }
                         }
         
+                        // Table drawing for each data type
                         match self.dropdown {
                             Selection::SensorData => {
                                 if show_table == true {
-                                    //ui.add_space(10.0);
                                     ui.heading("Sensor Data:");
                                     egui::ScrollArea::vertical().id_salt("All")
                                     .show(ui, |ui| {
@@ -234,7 +250,6 @@ impl DataWindow {
                             }
                             Selection::LocData => {
                                 if show_table == true {
-                                    //ui.add_space(10.0);
                                     ui.heading("Sensor Data:");
                                     egui::ScrollArea::vertical().id_salt("Loc")
                                     .show(ui, |ui| {
@@ -266,7 +281,6 @@ impl DataWindow {
                             }
                             Selection::AccelData => {
                                 if show_table == true {
-                                    //ui.add_space(10.0);
                                     ui.heading("Sensor Data:");
                                     egui::ScrollArea::vertical().id_salt("Accel")
                                     .show(ui, |ui| {
@@ -309,6 +323,8 @@ impl DataWindow {
                                         ui.separator();  
                                     });
                                 }
+
+                                // Graph drawing
                                 if show_graph == true {
                                     egui::ScrollArea::vertical().id_salt("Graph")
                                     .show(ui, |ui| {
@@ -335,7 +351,6 @@ impl DataWindow {
                                                 ui.line(Line::new(accel_y).name("Accel Y").color(egui::Color32::GREEN));
                                                 ui.line(Line::new(accel_z).name("Accel Z").color(egui::Color32::BLUE));
                                             });
-                                    
                                     });
                                 }    
                             }
@@ -345,4 +360,3 @@ impl DataWindow {
         });
     }
 }
-
