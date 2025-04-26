@@ -56,7 +56,7 @@ pub struct DisplayApp {
 impl DisplayApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
 
-        let csv_data = include_str!("../data/mockdata.csv");
+        let csv_data = include_str!("../temp_data/mockdata.csv");
         
         let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(Cursor::new(csv_data));
 

@@ -1,9 +1,9 @@
-mod app;
+mod display;
 
 const CANVAS_ID: &str = "canvasId";
 
 fn main() {
-    use app::DisplayApp;
+    use display::DisplayApp;
     use wasm_bindgen::JsCast as _;
 
     //redirect log messages to console.log
