@@ -1,138 +1,333 @@
-use eframe::{
-    egui::{CentralPanel, Color32, Pos2, Rect, Shape, Ui},
-    emath,
-};
-use std::f32::consts::PI;
+use eframe::egui::{CentralPanel, ComboBox, TopBottomPanel, Frame};
+use egui_extras::{TableBuilder, Column};
+use egui_plot::{Plot, Line, PlotPoints, Legend};
+use serde::Deserialize;
+use std::io::Cursor;
+use csv::ReaderBuilder;
 
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)]
-pub struct DisplayApp {
-    /* This how you opt-out of serialization of a field
-    #[serde(skip)]
-    value: f32*/
+#[derive(Deserialize)]
+pub struct Row {
+    id: u32,
+    timestamp: String,
+    latitude: f64,
+    longitude: f64,
+    altitude: f64,
+    accel_x: f64,
+    accel_y: f64,
+    accel_z: f64,
+    gyro_x: f64,
+    gyro_y: f64,
+    gyro_z: f64,
+    dac_1: f64,
+    dac_2: f64,
+    dac_3: f64,
+    dac_4: f64,
 }
 
-impl Default for DisplayApp {
-    fn default() -> Self {
-        Self {}
-    }
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Theme {
+    LightMode,
+    DarkMode
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Selection {
+    SensorData,
+    LocData,
+    AccelData
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DisplayType {
+    All,
+    Table,
+    Graph,
+    Map
+}
+
+pub struct DisplayApp {
+    table_headers: Vec<String>,
+    table_data: Vec<Row>,
+    dropdown: Selection,
+    theme_dropdown: Theme,
+    display_dropdown: DisplayType
 }
 
 impl DisplayApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
-        //TODO: Load previous app state if any (must enable the `persistence` feature)
+        let csv_data = include_str!("../temp_data/mockdata.csv");
+        
+        let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(Cursor::new(csv_data));
 
-        Default::default()
-    }
+        let header_row = rdr.headers().expect("Error reading headers").clone();
+        
+        let mut data: Vec<Row> = Vec::new();
+        let mut headers: Vec<String> = Vec::new();
+        
+        for result in rdr.deserialize() {
+            match result {
+                Ok(row) => data.push(row),
+                Err(e) => eprintln!("Error reading CSV: {e}"),
+            }
+        }
 
-    fn rgb_hsv(color: Color32) -> (f32, f32, f32) {
-        let r = color.r() as f32 / 255.;
-        let g = color.g() as f32 / 255.;
-        let b = color.b() as f32 / 255.;
-
-        let c_max: f32 = f32::max(r, f32::max(g, b));
-        let c_min = f32::min(r, f32::min(g, b));
-        let delta = c_max - c_min;
-
-        let hue: f32 = if c_max == r {
-            60. * (((g - b) / delta) % 6.)
-        } else if c_max == g {
-            60. * (((b - r) / delta) + 2.)
-        } else if c_max == b {
-            60. * (((r - g) / delta) + 4.)
-        } else {
-            0.
-        };
-        let saturation: f32 = match c_max {
-            0. => 0.,
-            _ => delta / c_max,
-        };
-
-        (hue, saturation * 100., c_max * 100.)
-    }
-
-    fn hsv_rgb(color: (f32, f32, f32)) -> Color32 {
-        let c = color.2 * color.1;
-        let x = c * (1. - f32::abs(((color.1 / 60.) % 2.) - 1.));
-        let m = color.2 - c;
-
-        let (r, g, b) = match color.1 {
-            0.0..=60.0 => (c, x, 0.),
-            60.0..=120.0 => (x, c, 0.),
-            120.0..=180.0 => (0., c, x),
-            180.0..=240.0 => (0., x, c),
-            240.0..=300.0 => (x, 0., c),
-            _ => (c, 0., x),
-        };
-        Color32::from_rgb(
-            ((r + m) * 255.) as u8,
-            ((g + m) * 255.) as u8,
-            ((b + m) * 255.) as u8,
-        )
-    }
-
-    fn spiral(&mut self, ui: &mut Ui) {
-        ui.ctx().request_repaint();
-        let time = ui.input(|i| i.time);
-        let speed = 0.05;
-
-        let radius: f32 = 2.;
-        let p = 1;
-        let q = 10;
-        let phase: f32 = p as f32 / q as f32;
-        let range: f32 = 2. * PI * q as f32 / p as f32;
-        let pos = |x: f32, operations: Option<(emath::Vec2, emath::Vec2)>| -> Pos2 {
-            let (translate, scale) =
-                operations.unwrap_or((emath::Vec2 { x: 0., y: 0. }, emath::Vec2 { x: 1., y: 1. }));
-            Pos2::new(
-                scale.x * (radius * f32::cos(x) + f32::cos(x * phase) + translate.x),
-                scale.y * (radius * f32::sin(x) - f32::sin(x * phase) + translate.y),
-            )
-        };
-
-        //draw shapes (circles) at points in range [0, range]
-        let rect = ui.painter().clip_rect();
-        let max = pos(range, None).x;
-        let dims = rect.size();
-        let ratio = rect.square_proportions() / rect.square_proportions().max_elem();
-        let translate = emath::Vec2 { x: max, y: max };
-        let scale = dims / (2. * max);
-        //log::info!("max: {max}");
-        //log::info!("dims: {dims}");
-
-        let n = 500;
-        let spacing = range / n as f32;
-        let points = (0..n)
-            .filter_map(|i| {
-                let point = pos(
-                    (i as f32 * spacing) + (time * speed) as f32,
-                    Some((translate * rect.square_proportions(), scale * ratio.yx())),
-                );
-                if rect.intersects(Rect::from_pos(point)) {
-                    Some(Shape::circle_filled(
-                        point,
-                        5.,
-                        DisplayApp::hsv_rgb(DisplayApp::rgb_hsv(Color32::GREEN)), //TODO: change color based on rotation as hue
-                    ))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<Shape>>();
-
-        ui.painter().extend(points);
+        for h in header_row.iter() {
+            headers.push(h.to_string());
+        }
+        
+        DisplayApp {
+            table_headers: headers,
+            table_data: data,
+            dropdown: Selection::SensorData,
+            theme_dropdown: Theme::DarkMode,
+            display_dropdown: DisplayType::All
+        }
     }
 }
 
 impl eframe::App for DisplayApp {
-    //TODO: fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
-
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+        match self.theme_dropdown {
+            Theme::LightMode => {
+                ctx.set_visuals(egui::Visuals::light());
+            }
+            Theme::DarkMode => {
+                ctx.set_visuals(egui::Visuals::dark());
+            }
+        }
+
+        TopBottomPanel::top("top").show(ctx, |ui| {
+            Frame::none()
+                .fill(egui::Color32::LIGHT_GRAY)
+                .inner_margin(egui::Margin::symmetric(10.0, 10.0))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Theme:");
+                        ComboBox::from_id_salt("Theme")
+                            .selected_text(match self.theme_dropdown {
+                                Theme::LightMode => "Light Mode",
+                                Theme::DarkMode => "Dark Mode",
+                            })
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.theme_dropdown, Theme::LightMode, "Light Mode");
+                                ui.selectable_value(&mut self.theme_dropdown, Theme::DarkMode, "Dark Mode");
+                            });
+                        ui.add_space(20.0);
+                        ui.label("Sensor:");
+                        ComboBox::from_id_salt("SensorData")
+                            .selected_text(match self.dropdown {
+                                Selection::SensorData => "All Data",
+                                Selection::LocData => "Location Data",
+                                Selection::AccelData => "Acceleration Data",
+                            })
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.dropdown, Selection::SensorData, "All Data");
+                                ui.selectable_value(&mut self.dropdown, Selection::LocData, "Location Data");
+                                ui.selectable_value(&mut self.dropdown, Selection::AccelData, "Acceleration Data");
+                            });
+                        ui.add_space(20.0);
+                        ui.label("Display Type:");
+                        ComboBox::from_id_salt("DisplayType")
+                            .selected_text(match self.display_dropdown {
+                                DisplayType::All => "All",
+                                DisplayType::Table => "Table",
+                                DisplayType::Graph => "Graph",
+                                DisplayType::Map => "Map",
+                            })
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.display_dropdown, DisplayType::All, "All");
+                                ui.selectable_value(&mut self.display_dropdown, DisplayType::Table, "Table");
+                                ui.selectable_value(&mut self.display_dropdown, DisplayType::Graph, "Graph");
+                                ui.selectable_value(&mut self.display_dropdown, DisplayType::Map, "Map");
+                            });
+                    });
+                })
+        });
+
         CentralPanel::default().show(ctx, |ui| {
-            self.spiral(ui);
+            let mut show_table = true;
+            let mut show_graph = true;
+            let mut show_map = true;
+
+            Frame::none()
+                .outer_margin(egui::Margin::symmetric(10.0, 10.0))
+                .show(ui, |ui| {
+                    match self.display_dropdown {
+                        DisplayType::All => {
+                            show_table = true;
+                            show_graph = true;
+                            show_map = true;
+                        }
+                        DisplayType::Table => {
+                            show_table = true;
+                            show_graph = false;
+                            show_map = false;
+                        }
+                        DisplayType::Graph => {
+                            show_table = false;
+                            show_graph = true;
+                            show_map = false;
+                        }
+                        DisplayType::Map => {
+                            show_table = false;
+                            show_graph = false;
+                            show_map = true;
+                        }
+                    }
+
+                    match self.dropdown {
+                        Selection::SensorData => {
+                            if show_table == true {
+                                //ui.add_space(10.0);
+                                ui.heading("Sensor Data:");
+                                egui::ScrollArea::vertical().id_salt("All")
+                                .show(ui, |ui| {
+                                    TableBuilder::new(ui)
+                                        .striped(true)
+                                        .resizable(true)
+                                        .columns(Column::auto(), self.table_headers.len())
+                                        .header(30.0, |mut header| {
+                                            for h in &self.table_headers {
+                                                header.col(|ui| {
+                                                    ui.heading(h);
+                                                });
+                                            }
+                                        })
+                                        .body(|mut body| {
+                                            for r in &self.table_data {
+                                                body.row(20.0, |mut row_ui| {
+                                                    row_ui.col(|ui| { ui.label(r.id.to_string()); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.24}",r.timestamp.clone())); });
+                                                    row_ui.col(|ui| { ui.label(r.latitude.to_string()); });
+                                                    row_ui.col(|ui| { ui.label(r.longitude.to_string()); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.altitude.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_x.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.accel_y.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.accel_z.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_x.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_y.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_z.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_1.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_2.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_3.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_4.to_string())); });
+                                                });
+                                            }  
+                                        });
+                                    ui.separator();  
+                                });
+                            }
+                        }
+                        Selection::LocData => {
+                            if show_table == true {
+                                //ui.add_space(10.0);
+                                ui.heading("Sensor Data:");
+                                egui::ScrollArea::vertical().id_salt("Loc")
+                                .show(ui, |ui| {
+                                    TableBuilder::new(ui)
+                                        .striped(true)
+                                        .resizable(true)
+                                        .columns(Column::auto(), 5)
+                                        .header(30.0, |mut header| {
+                                            for h in self.table_headers.iter().take(5) {
+                                                header.col(|ui| {
+                                                    ui.heading(h);
+                                                });
+                                            }
+                                        })
+                                        .body(|mut body| {
+                                            for r in &self.table_data {
+                                                body.row(20.0, |mut row_ui| {
+                                                    row_ui.col(|ui| { ui.label(r.id.to_string()); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.24}",r.timestamp.clone())); });
+                                                    row_ui.col(|ui| { ui.label(r.latitude.to_string()); });
+                                                    row_ui.col(|ui| { ui.label(r.longitude.to_string()); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}",r.altitude.to_string())); });
+                                                });
+                                            }  
+                                        });
+                                    ui.separator();  
+                                });
+                            }
+                        }
+                        Selection::AccelData => {
+                            if show_table == true {
+                                //ui.add_space(10.0);
+                                ui.heading("Sensor Data:");
+                                egui::ScrollArea::vertical().id_salt("Accel")
+                                .show(ui, |ui| {
+                                    TableBuilder::new(ui)
+                                        .striped(true)
+                                        .resizable(true)
+                                        .columns(Column::auto(), 5)
+                                        .header(30.0, |mut header| {
+                                            for h in self.table_headers.iter().take(2) {
+                                                header.col(|ui| {
+                                                    ui.heading(h);
+                                                });
+                                            }
+                                            for h in self.table_headers.iter().skip(5).take(3) {
+                                                header.col(|ui| {
+                                                    ui.heading(h);
+                                                });
+                                            }
+                                        })
+                                        .body(|mut body| {
+                                            for r in &self.table_data {
+                                                body.row(20.0, |mut row_ui| {
+                                                    row_ui.col(|ui| { ui.label(r.id.to_string()); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.24}", r.timestamp.clone())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_x.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_y.to_string())); });
+                                                    row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_z.to_string())); });
+                                                });
+                                            }  
+                                        });
+    
+                                    ui.add_space(10.0);
+                                    let len = self.table_data.len() as f64;
+                                    let avg_accel_x: f64 = self.table_data.iter().map(|row| row.accel_x).sum::<f64>();
+                                    let avg_accel_y: f64 = self.table_data.iter().map(|row| row.accel_y).sum::<f64>();
+                                    let avg_accel_z: f64 = self.table_data.iter().map(|row| row.accel_z).sum::<f64>();
+                                    ui.label(format!("Average Acceleration in X: {:.4}", avg_accel_x/len));
+                                    ui.label(format!("Average Acceleration in Y: {:.4}", avg_accel_y/len));
+                                    ui.label(format!("Average Acceleration in Z: {:.4}", avg_accel_z/len));
+                                    ui.separator();  
+                                });
+                            }
+                            if show_graph == true {
+                                egui::ScrollArea::vertical().id_salt("Graph")
+                                .show(ui, |ui| {
+                                    ui.add_space(10.0);
+                                    ui.heading("Sensor Graph:");
+    
+                                    let accel_x: PlotPoints = self.table_data.iter()
+                                        .map(|row| [row.id as f64, row.accel_x]).collect();
+    
+                                    let accel_y: PlotPoints = self.table_data.iter()
+                                        .map(|row| [row.id as f64, row.accel_y]).collect();
+    
+                                    let accel_z: PlotPoints = self.table_data.iter()
+                                        .map(|row| [row.id as f64, row.accel_z]).collect();
+    
+                                    Plot::new("accel_graph")
+                                        .legend(Legend::default())
+                                        .x_axis_label("ID")
+                                        .y_axis_label("Acceleration")
+                                        .width(800.0)
+                                        .height(300.0)
+                                        .show(ui, |ui| {
+                                            ui.line(Line::new(accel_x).name("Accel X").color(egui::Color32::RED));
+                                            ui.line(Line::new(accel_y).name("Accel Y").color(egui::Color32::GREEN));
+                                            ui.line(Line::new(accel_z).name("Accel Z").color(egui::Color32::BLUE));
+                                        });
+                                
+                                });
+                            }    
+                        }
+                    }
+                })        
         });
     }
 }
