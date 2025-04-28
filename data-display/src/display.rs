@@ -7,6 +7,7 @@ mod account;
 mod device;
 mod login;
 mod sessions;
+mod data;
 
 use eframe::egui;
 
@@ -18,6 +19,7 @@ pub struct DisplayApp {
     window_account: account::AccountDisplay,
     window_sessions: sessions::SessionDisplay,
     window_device: device::DeviceDisplay,
+    window_data: data::DataWindow,
 }
 
 impl Default for DisplayApp {
@@ -34,6 +36,7 @@ impl Default for DisplayApp {
             window_account: account::AccountDisplay::new(),
             window_sessions: sessions::SessionDisplay::new(),
             window_device: device::DeviceDisplay::new(),
+            window_data: data::DataWindow::new(),
         }
     }
 }
@@ -89,6 +92,7 @@ impl eframe::App for DisplayApp {
             self.window_account.draw(ctx);
             self.window_sessions.draw(ctx);
             self.window_device.draw(ctx);
+            self.window_data.draw(ctx);
         }
     }
 }
