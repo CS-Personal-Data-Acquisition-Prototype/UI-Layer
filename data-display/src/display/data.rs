@@ -1,6 +1,9 @@
 //! Main data display window
 //!
 
+extern crate client;
+use client::api::{session_sensor_data};
+
 use eframe::egui::{ComboBox, Frame};
 use egui_extras::{TableBuilder, Column};
 use egui_plot::{Plot, Line, PlotPoints, Legend};
@@ -26,6 +29,18 @@ pub struct Row {
     dac_2: f64,
     dac_3: f64,
     dac_4: f64,
+}
+
+#[derive(Deserialize)]
+pub struct Row2 {
+    datetime: String,
+    sessionsensorID: String,
+    data_blob: String,
+}
+
+#[derive(Deserialize)]
+pub struct DataResponse {
+    pub datapoints: Vec<Row2>,
 }
 
 /// Theme dropdown/toggle
@@ -56,27 +71,18 @@ pub enum DisplayType {
 pub struct DataWindow {
     table_headers: Vec<String>,
     table_data: Vec<Row>,
+    datapoints: Vec<Row2>,
     dropdown: Selection,
     theme_dropdown: Theme,
     display_dropdown: DisplayType,
-    fullscreen: bool
-}
-
-impl Default for DataWindow {
-    fn default() -> Self {
-        Self {
-            table_headers: Vec::new(),
-            table_data: Vec::new(),
-            dropdown: Selection::SensorData,
-            theme_dropdown: Theme::DarkMode,
-            display_dropdown: DisplayType::All,
-            fullscreen: false
-        }
-    }
+    fullscreen: bool,
+    loaded: bool,
+    prev_session: String,
+    current_session: *mut String,
 }
 
 impl DataWindow {
-    pub fn new() -> Self {
+    pub fn new(current_session: *mut String) -> Self {
 
         // Data input section (will change when connected to server)
         let csv_data = include_str!("../../temp_data/mockdata.csv");
@@ -100,24 +106,79 @@ impl DataWindow {
             headers.push(h.to_string());
         }
 
+
         // Initialize
         DataWindow {
             table_headers: headers,
             table_data: data,
+            datapoints: Vec::new(),
             dropdown: Selection::AccelData,
             theme_dropdown: Theme::DarkMode,
             display_dropdown: DisplayType::Table,
-            fullscreen: false
+            fullscreen: false,
+            loaded: false,
+            prev_session: String::new(),
+            current_session,
         }
+    }
+
+    pub fn load_data(&mut self) {
+        self.loaded = true;
+
+        let current_session_string = unsafe { (*self.current_session).clone() };
+
+        let data_ptr: *mut Vec<Row2> = &mut self.datapoints;
+
+        let client = client::get_client();
+
+        // currently not working
+        wasm_bindgen_futures::spawn_local(async move {
+            let (status, val) = session_sensor_data::view_datapoints_by_session_id(&client, &current_session_string).await;
+            
+            if status == 200 {
+                web_sys::console::log_1( &format!("Data loaded. Status: {}", status).into() );
+
+                if let Some(val) = val {
+                web_sys::console::log_1(&format!("Raw response: {:?}", val).into());
+
+                match serde_json::from_value::<DataResponse>(val) {
+                    Ok(parsed) => {
+                        unsafe {
+                            *data_ptr = parsed.datapoints;
+                        }
+                    }
+                    Err(e) => {
+                        web_sys::console::log_1(&format!("Failed to parse Data: {}", e).into());
+                    }
+                }
+            }
+                
+            } else {
+                web_sys::console::log_1( &format!("Data failed. Status: {}", status).into() );
+            }
+        });
     }
 
     /// Draw the data window
     pub fn draw(&mut self, ctx: &eframe::egui::Context, ) -> () {
+        let current_session_string = unsafe { (*self.current_session).clone() };
+
+        if current_session_string != self.prev_session {
+            self.prev_session = current_session_string.clone();
+            self.loaded = false
+        }
+
+        if !self.loaded { self.load_data(); }
+
         eframe::egui::Window::new("Data Window")
         .resizable(true)
         .auto_sized()
         .movable(!self.fullscreen)
         .show(ctx, |ui| {
+
+            unsafe {
+                ui.label( format!("Current session: {}", *self.current_session));
+            }
 
             // Set fullscreen size
             if self.fullscreen {

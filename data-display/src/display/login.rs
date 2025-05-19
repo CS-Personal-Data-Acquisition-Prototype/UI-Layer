@@ -1,10 +1,15 @@
 //! The login manager
 
+extern crate client;
+//use client::api::{auth};
+use client::api::{user};
+
 /// Handles drawing the login window and facilitates authentication with the backend api.
 pub struct LoginDisplay {
     /// Pointer received at creation from the display manager to control
     ///     window drawing based on login state.
     logged_in: *mut bool,
+    username: *mut String,
 
     /// Tracker for failed login attempts
     _failed_attempts: u8, // unimplemented
@@ -16,9 +21,10 @@ pub struct LoginDisplay {
 }
 
 impl LoginDisplay {
-    pub fn new(logged_in: *mut bool) -> Self {
+    pub fn new(logged_in: *mut bool, username: *mut String) -> Self {
         LoginDisplay {
             logged_in: logged_in,
+            username: username,
             _failed_attempts: 0,
 
             username_str: String::from(""),
@@ -43,6 +49,7 @@ impl LoginDisplay {
         // If successful, show sessions window and set fail count to 0
         unsafe {
             *self.logged_in = true;
+            *self.username = self.username_str.trim().to_string();
         }
 
         // If fail, increment fail count
@@ -62,6 +69,7 @@ impl LoginDisplay {
         let passwd_widget = eframe::egui::TextEdit::singleline(&mut self.password_str);
 
         let login_btn = eframe::egui::Button::new("Login");
+        let new_btn = eframe::egui::Button::new("Create New User");
 
         // TODO: Show failed login attempt
 
@@ -71,16 +79,54 @@ impl LoginDisplay {
         ui.label("Password:");
         ui.add(passwd_widget);
 
+        if ui.add(new_btn).clicked() {
+            let username = self.username_str.trim().to_string();
+            let password = self.password_str.trim().to_string();
+
+            let client = client::get_client();
+
+            wasm_bindgen_futures::spawn_local(async move {
+                let (status, _val) = user::create_user(&client, &username, &password,).await;
+            
+                if status == 201 {
+                    web_sys::console::log_1( &format!("Success. Status: {}", status).into() );
+                } else {
+                    web_sys::console::log_1( &format!("Failed. Status: {}", status).into() );
+                }
+            });
+        };
+
+        // authentication currently bypassed
         if ui.add(login_btn).clicked() {
+            // let username = self.username_str.trim().to_string();
+            // let password = self.password_str.trim().to_string();
+
+            // authentication is currently broken
+
+            // let client = client::get_client();
+            
+            // wasm_bindgen_futures::spawn_local(async move {
+            //     let (status, _val, _val2) = auth::user_login(&client, &username, &password,).await;
+            
+            //     if status == 201 {
+            //         web_sys::console::log_1( &format!("Success. Status: {}", status).into() );
+            //     } else {
+            //         web_sys::console::log_1( &format!("Failed. Status: {}", status).into() );
+            //     }
+            // });
+            
             self.login();
-        }
+        };
     }
 
     /// Helper function to draw window contents when we are logged in
     fn show_logged_in(&mut self, ui: &mut eframe::egui::Ui) {
         let logout_btn = eframe::egui::Button::new("Logout");
 
-        ui.label("Logged in as: PLACEHOLDER");
+        unsafe {
+            ui.label( format!("Logged in as: {}", *self.username));
+        }
+
         if ui.add(logout_btn).clicked() {
             self.logout();
         }

@@ -12,8 +12,11 @@ mod data;
 use eframe::egui;
 
 /// Container for all window-controlling structs. Manages shared resources and calls draw() functions.
+#[allow(dead_code)]
 pub struct DisplayApp {
     logged_in: Box<bool>,
+    username: Box<String>,
+    current_session: Box<String>,
 
     window_login: login::LoginDisplay,
     window_account: account::AccountDisplay,
@@ -26,17 +29,21 @@ impl Default for DisplayApp {
     fn default() -> Self {
         // This allocates a box and unwraps the heap pointer
         let logged_in_ptr: *mut bool = Box::into_raw(Box::new(false));
+        let username_ptr: *mut String = Box::into_raw(Box::new(String::new()));
+        let current_session_ptr: *mut String = Box::into_raw(Box::new(String::new()));
 
         Self {
             // This puts the box back together to avoid leaks
             logged_in: unsafe { Box::from_raw(logged_in_ptr) },
+            username: unsafe { Box::from_raw(username_ptr) },
+            current_session: unsafe { Box::from_raw(current_session_ptr) },
 
             // Declare windows we will draw and provide pointers to shared resources
-            window_login: login::LoginDisplay::new(logged_in_ptr),
+            window_login: login::LoginDisplay::new(logged_in_ptr, username_ptr),
             window_account: account::AccountDisplay::new(),
-            window_sessions: sessions::SessionDisplay::new(),
+            window_sessions: sessions::SessionDisplay::new(username_ptr, current_session_ptr),
             window_device: device::DeviceDisplay::new(),
-            window_data: data::DataWindow::new(),
+            window_data: data::DataWindow::new(current_session_ptr),
         }
     }
 }
