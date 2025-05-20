@@ -8,8 +8,6 @@ use eframe::egui::{ComboBox, Frame};
 use egui_extras::{TableBuilder, Column};
 use egui_plot::{Plot, Line, PlotPoints, Legend};
 use serde::Deserialize;
-use std::io::Cursor;
-use csv::ReaderBuilder;
 
 /// Row object for csv data (likely to change when connected to backend)
 #[derive(Deserialize)]
@@ -32,9 +30,26 @@ pub struct Row {
 }
 
 #[derive(Deserialize)]
+pub struct Blob {
+    lat: f64,
+    lon: f64,
+    alt: f64,
+    accel_x: f64,
+    accel_y: f64,
+    accel_z: f64,
+    gyro_x: f64,
+    gyro_y: f64,
+    gyro_z: f64,
+    dac_1: f64,
+    dac_2: f64,
+    dac_3: f64,
+    dac_4: f64,
+}
+
+#[derive(Deserialize)]
 pub struct Row2 {
     datetime: String,
-    sessionsensorID: String,
+    id: i64,
     data_blob: String,
 }
 
@@ -83,34 +98,28 @@ pub struct DataWindow {
 
 impl DataWindow {
     pub fn new(current_session: *mut String) -> Self {
-
-        // Data input section (will change when connected to server)
-        let csv_data = include_str!("../../temp_data/mockdata.csv");
-        
-        let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(Cursor::new(csv_data));
-
-        let header_row = rdr.headers().expect("Error reading headers").clone();
-        
-        let mut data: Vec<Row> = Vec::new();
-        let mut headers: Vec<String> = Vec::new();
-        
-        // Put data and headers into vectors
-        for result in rdr.deserialize() {
-            match result {
-                Ok(row) => data.push(row),
-                Err(e) => eprintln!("Error reading CSV: {e}"),
-            }
-        }
-
-        for h in header_row.iter() {
-            headers.push(h.to_string());
-        }
-
+        let headers = vec![
+            "id".to_string(),
+            "timestamp".to_string(),
+            "latitude".to_string(),
+            "longitude".to_string(),
+            "altitude".to_string(),
+            "accel_x".to_string(),
+            "accel_y".to_string(),
+            "accel_z".to_string(),
+            "gyro_x".to_string(),
+            "gyro_y".to_string(),
+            "gyro_z".to_string(),
+            "dac_1".to_string(),
+            "dac_2".to_string(),
+            "dac_3".to_string(),
+            "dac_4".to_string(),
+        ];
 
         // Initialize
         DataWindow {
             table_headers: headers,
-            table_data: data,
+            table_data: Vec::new(),
             datapoints: Vec::new(),
             dropdown: Selection::AccelData,
             theme_dropdown: Theme::DarkMode,
@@ -131,7 +140,6 @@ impl DataWindow {
 
         let client = client::get_client();
 
-        // currently not working
         wasm_bindgen_futures::spawn_local(async move {
             let (status, val) = session_sensor_data::view_datapoints_by_session_id(&client, &current_session_string).await;
             
@@ -139,24 +147,66 @@ impl DataWindow {
                 web_sys::console::log_1( &format!("Data loaded. Status: {}", status).into() );
 
                 if let Some(val) = val {
-                web_sys::console::log_1(&format!("Raw response: {:?}", val).into());
-
-                match serde_json::from_value::<DataResponse>(val) {
-                    Ok(parsed) => {
-                        unsafe {
-                            *data_ptr = parsed.datapoints;
+                    match serde_json::from_value::<DataResponse>(val) {
+                        Ok(parsed) => {
+                            unsafe {
+                                *data_ptr = parsed.datapoints;
+                            }
+                        }
+                        Err(e) => {
+                            web_sys::console::log_1(&format!("Failed to parse Data: {}", e).into());
                         }
                     }
-                    Err(e) => {
-                        web_sys::console::log_1(&format!("Failed to parse Data: {}", e).into());
-                    }
                 }
-            }
                 
             } else {
-                web_sys::console::log_1( &format!("Data failed. Status: {}", status).into() );
+                web_sys::console::log_1( &format!("Data failed. Status: {}", status).into());
             }
         });
+
+        
+    }
+
+    pub fn format_data(&mut self) {
+        self.table_data.clear();
+
+        for row in &self.datapoints {
+            let col: Vec<&str> = row.data_blob.split(',').collect();
+
+            let blob = Blob {
+                lat: col[0].trim().parse::<f64>().unwrap_or(0.0),
+                lon: col[1].trim().parse::<f64>().unwrap_or(0.0),
+                alt: col[2].trim().parse::<f64>().unwrap_or(0.0),
+                accel_x: col[3].trim().parse::<f64>().unwrap_or(0.0),
+                accel_y: col[4].trim().parse::<f64>().unwrap_or(0.0),
+                accel_z: col[5].trim().parse::<f64>().unwrap_or(0.0),
+                gyro_x: col[6].trim().parse::<f64>().unwrap_or(0.0),
+                gyro_y: col[7].trim().parse::<f64>().unwrap_or(0.0),
+                gyro_z: col[8].trim().parse::<f64>().unwrap_or(0.0),
+                dac_1: col[9].trim().parse::<f64>().unwrap_or(0.0),
+                dac_2: col[10].trim().parse::<f64>().unwrap_or(0.0),
+                dac_3: col[11].trim().parse::<f64>().unwrap_or(0.0),
+                dac_4: col[12].trim().parse::<f64>().unwrap_or(0.0),
+            };
+
+            self.table_data.push(Row {
+                id: row.id as u32,
+                timestamp: row.datetime.clone(),
+                latitude: blob.lat,
+                longitude: blob.lon,
+                altitude: blob.alt,
+                accel_x: blob.accel_x,
+                accel_y: blob.accel_y,
+                accel_z: blob.accel_z,
+                gyro_x: blob.gyro_x,
+                gyro_y: blob.gyro_y,
+                gyro_z: blob.gyro_z,
+                dac_1: blob.dac_1,
+                dac_2: blob.dac_2,
+                dac_3: blob.dac_3,
+                dac_4: blob.dac_4,
+            });
+        }
     }
 
     /// Draw the data window
@@ -168,7 +218,12 @@ impl DataWindow {
             self.loaded = false
         }
 
-        if !self.loaded { self.load_data(); }
+        if !self.loaded { 
+            self.load_data(); 
+        }
+
+        self.format_data(); 
+        ctx.request_repaint(); 
 
         eframe::egui::Window::new("Data Window")
         .resizable(true)
@@ -410,14 +465,14 @@ impl DataWindow {
                                 ui.add_space(10.0);
                                 ui.heading("Sensor Graph:");
 
-                                let accel_x: PlotPoints = self.table_data.iter()
-                                    .map(|row| [row.id as f64, row.accel_x]).collect();
+                                let accel_x: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.accel_x]).collect();
 
-                                let accel_y: PlotPoints = self.table_data.iter()
-                                    .map(|row| [row.id as f64, row.accel_y]).collect();
+                                let accel_y: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.accel_y]).collect();
 
-                                let accel_z: PlotPoints = self.table_data.iter()
-                                    .map(|row| [row.id as f64, row.accel_z]).collect();
+                                let accel_z: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.accel_z]).collect();
 
                                 Plot::new("accel_graph")
                                     .legend(Legend::default())
