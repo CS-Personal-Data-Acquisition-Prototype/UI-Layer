@@ -7,11 +7,12 @@ use client::api::{session};
 //use eframe::egui::RichText;
 
 use serde::Deserialize;
-use serde_json::Value;
 
 /// Handles displaying and managing historcal data recording sessions and
 ///     initiates the recording of new data sessions.
 ///
+
+#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct Row {
     pub session_id: i64,
@@ -23,6 +24,7 @@ pub struct SessionResponse {
     pub sessions: Vec<Row>,
 }
 
+#[allow(dead_code)]
 pub struct SessionDisplay {
     username: *mut String, 
     session_id_str: String,

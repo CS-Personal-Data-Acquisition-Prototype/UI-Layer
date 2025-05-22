@@ -47,6 +47,7 @@ pub struct Blob {
     dac_4: f64,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct Row2 {
     datetime: String,
@@ -95,6 +96,9 @@ pub struct DataWindow {
     loaded: bool,
     prev_session: String,
     current_session: *mut String,
+    current_page: usize,
+    direction: bool,
+    direction_text: String,
 }
 
 impl DataWindow {
@@ -129,6 +133,9 @@ impl DataWindow {
             loaded: false,
             prev_session: String::new(),
             current_session,
+            current_page: 0,
+            direction: false,
+            direction_text: "Sort: ascending v".to_string(),
         }
     }
 
@@ -172,11 +179,11 @@ impl DataWindow {
     pub fn format_data(&mut self) {
         self.table_data.clear();
 
-        for row in &self.datapoints {
-            let blob = match serde_json::from_value::<Blob>(row.data_blob.clone()) {
+        for (i, row) in self.datapoints.iter().enumerate() {
+            match serde_json::from_value::<Blob>(row.data_blob.clone()) {
                 Ok(parsed) => {
                     self.table_data.push(Row {
-                        id: row.id as u32,
+                        id: i as u32,
                         timestamp: row.datetime.clone(),
                         latitude: parsed.lat,
                         longitude: parsed.lon,
@@ -197,6 +204,10 @@ impl DataWindow {
                     web_sys::console::log_1(&format!("Failed to format data: {}", e).into());
                 }
             };
+        }
+
+        if self.direction == false {
+            self.table_data.reverse();
         }
     }
 
@@ -299,6 +310,31 @@ impl DataWindow {
                         if ui.button("Fullscreen").clicked() {
                             self.fullscreen = !self.fullscreen;
                         }
+
+                        // Page controls
+                        let last_page = (self.table_data.len() + 9) / 10;
+
+                        if ui.button("<").clicked() && self.current_page > 0 {
+                            self.current_page -= 1;
+                        }
+
+                        ui.label(format!("Page {}/{}", self.current_page + 1, last_page));
+
+                        if ui.button(">").clicked() && self.current_page + 1 < last_page {
+                            self.current_page += 1;
+                        }
+
+                        if ui.button(&self.direction_text).clicked() {
+                            if self.direction_text == "Sort: descending v" {
+                                self.direction_text = "Sort: ascending ^".to_string();
+                                self.direction = !self.direction;
+                            }
+                            else {
+                                self.direction_text = "Sort: descending v".to_string();
+                                self.direction = !self.direction;
+                            }
+                            
+                        }
                     });
                 });
         
@@ -358,7 +394,9 @@ impl DataWindow {
                                         }
                                     })
                                     .body(|mut body| {
-                                        for r in &self.table_data {
+                                        let start_row = self.current_page * 10;
+                                        let end_row = (start_row + 10).min(self.table_data.len());
+                                        for r in &self.table_data[start_row..end_row] {
                                             body.row(20.0, |mut row_ui| {
                                                 row_ui.col(|ui| { ui.label(r.id.to_string()); });
                                                 row_ui.col(|ui| { ui.label(format!("{:.24}",r.timestamp.clone())); });
@@ -396,7 +434,9 @@ impl DataWindow {
                                         }
                                     })
                                     .body(|mut body| {
-                                        for r in &self.table_data {
+                                        let start_row = self.current_page * 10;
+                                        let end_row = (start_row + 10).min(self.table_data.len());
+                                        for r in &self.table_data[start_row..end_row] {
                                             body.row(20.0, |mut row_ui| {
                                                 row_ui.col(|ui| { ui.label(r.id.to_string()); });
                                                 row_ui.col(|ui| { ui.label(format!("{:.24}",r.timestamp.clone())); });
@@ -429,7 +469,9 @@ impl DataWindow {
                                         }
                                     })
                                     .body(|mut body| {
-                                        for r in &self.table_data {
+                                        let start_row = self.current_page * 10;
+                                        let end_row = (start_row + 10).min(self.table_data.len());
+                                        for r in &self.table_data[start_row..end_row] {
                                             body.row(20.0, |mut row_ui| {
                                                 row_ui.col(|ui| { ui.label(r.id.to_string()); });
                                                 row_ui.col(|ui| { ui.label(format!("{:.24}", r.timestamp.clone())); });
