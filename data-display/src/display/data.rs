@@ -8,6 +8,7 @@ use eframe::egui::{ComboBox, Frame};
 use egui_extras::{TableBuilder, Column};
 use egui_plot::{Plot, Line, PlotPoints, Legend};
 use serde::Deserialize;
+use serde_json::Value;
 
 /// Row object for csv data (likely to change when connected to backend)
 #[derive(Deserialize)]
@@ -50,7 +51,7 @@ pub struct Blob {
 pub struct Row2 {
     datetime: String,
     id: i64,
-    data_blob: String,
+    data_blob: Value,
 }
 
 #[derive(Deserialize)]
@@ -145,6 +146,7 @@ impl DataWindow {
             
             if status == 200 {
                 web_sys::console::log_1( &format!("Data loaded. Status: {}", status).into() );
+                //web_sys::console::log_1(&format!("Raw response: {:?}", val).into());
 
                 if let Some(val) = val {
                     match serde_json::from_value::<DataResponse>(val) {
@@ -154,13 +156,13 @@ impl DataWindow {
                             }
                         }
                         Err(e) => {
-                            web_sys::console::log_1(&format!("Failed to parse Data: {}", e).into());
+                            web_sys::console::log_1(&format!("Failed to parse data response: {}", e).into());
                         }
                     }
                 }
                 
             } else {
-                web_sys::console::log_1( &format!("Data failed. Status: {}", status).into());
+                web_sys::console::log_1( &format!("Data fetch failed. Status: {}", status).into());
             }
         });
 
@@ -171,41 +173,30 @@ impl DataWindow {
         self.table_data.clear();
 
         for row in &self.datapoints {
-            let col: Vec<&str> = row.data_blob.split(',').collect();
-
-            let blob = Blob {
-                lat: col[0].trim().parse::<f64>().unwrap_or(0.0),
-                lon: col[1].trim().parse::<f64>().unwrap_or(0.0),
-                alt: col[2].trim().parse::<f64>().unwrap_or(0.0),
-                accel_x: col[3].trim().parse::<f64>().unwrap_or(0.0),
-                accel_y: col[4].trim().parse::<f64>().unwrap_or(0.0),
-                accel_z: col[5].trim().parse::<f64>().unwrap_or(0.0),
-                gyro_x: col[6].trim().parse::<f64>().unwrap_or(0.0),
-                gyro_y: col[7].trim().parse::<f64>().unwrap_or(0.0),
-                gyro_z: col[8].trim().parse::<f64>().unwrap_or(0.0),
-                dac_1: col[9].trim().parse::<f64>().unwrap_or(0.0),
-                dac_2: col[10].trim().parse::<f64>().unwrap_or(0.0),
-                dac_3: col[11].trim().parse::<f64>().unwrap_or(0.0),
-                dac_4: col[12].trim().parse::<f64>().unwrap_or(0.0),
+            let blob = match serde_json::from_value::<Blob>(row.data_blob.clone()) {
+                Ok(parsed) => {
+                    self.table_data.push(Row {
+                        id: row.id as u32,
+                        timestamp: row.datetime.clone(),
+                        latitude: parsed.lat,
+                        longitude: parsed.lon,
+                        altitude: parsed.alt,
+                        accel_x: parsed.accel_x,
+                        accel_y: parsed.accel_y,
+                        accel_z: parsed.accel_z,
+                        gyro_x: parsed.gyro_x,
+                        gyro_y: parsed.gyro_y,
+                        gyro_z: parsed.gyro_z,
+                        dac_1: parsed.dac_1,
+                        dac_2: parsed.dac_2,
+                        dac_3: parsed.dac_3,
+                        dac_4: parsed.dac_4,
+                    });
+                }
+                Err(e) => {
+                    web_sys::console::log_1(&format!("Failed to format data: {}", e).into());
+                }
             };
-
-            self.table_data.push(Row {
-                id: row.id as u32,
-                timestamp: row.datetime.clone(),
-                latitude: blob.lat,
-                longitude: blob.lon,
-                altitude: blob.alt,
-                accel_x: blob.accel_x,
-                accel_y: blob.accel_y,
-                accel_z: blob.accel_z,
-                gyro_x: blob.gyro_x,
-                gyro_y: blob.gyro_y,
-                gyro_z: blob.gyro_z,
-                dac_1: blob.dac_1,
-                dac_2: blob.dac_2,
-                dac_3: blob.dac_3,
-                dac_4: blob.dac_4,
-            });
         }
     }
 
