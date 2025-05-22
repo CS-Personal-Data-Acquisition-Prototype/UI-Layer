@@ -9,8 +9,9 @@ use egui_extras::{TableBuilder, Column};
 use egui_plot::{Plot, Line, PlotPoints, Legend};
 use serde::Deserialize;
 use serde_json::Value;
+use web_sys::window;
 
-/// Row object for csv data (likely to change when connected to backend)
+/// Row object for table data
 #[derive(Deserialize)]
 pub struct Row {
     id: u32,
@@ -30,6 +31,7 @@ pub struct Row {
     dac_4: f64,
 }
 
+/// Blob object for mapping data_blob in response
 #[derive(Deserialize)]
 pub struct Blob {
     lat: f64,
@@ -47,6 +49,7 @@ pub struct Blob {
     dac_4: f64,
 }
 
+/// Individual response object 
 #[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct Row2 {
@@ -55,6 +58,7 @@ pub struct Row2 {
     data_blob: Value,
 }
 
+/// Response vector
 #[derive(Deserialize)]
 pub struct DataResponse {
     pub datapoints: Vec<Row2>,
@@ -84,7 +88,7 @@ pub enum DisplayType {
     Map
 }
 
-/// Main window for data display. Has top bar with dropdown selectors, table view, and graphiical view.
+/// Main window for data display
 pub struct DataWindow {
     table_headers: Vec<String>,
     table_data: Vec<Row>,
@@ -99,10 +103,13 @@ pub struct DataWindow {
     current_page: usize,
     direction: bool,
     direction_text: String,
+    last_refresh: f64,
 }
 
 impl DataWindow {
     pub fn new(current_session: *mut String) -> Self {
+
+        // Hardcoded headers
         let headers = vec![
             "id".to_string(),
             "timestamp".to_string(),
@@ -136,9 +143,11 @@ impl DataWindow {
             current_page: 0,
             direction: false,
             direction_text: "Sort: ascending v".to_string(),
+            last_refresh: 0.0,
         }
     }
 
+    /// Function to issue request and handle response from tcp server
     pub fn load_data(&mut self) {
         self.loaded = true;
 
@@ -153,7 +162,6 @@ impl DataWindow {
             
             if status == 200 {
                 web_sys::console::log_1( &format!("Data loaded. Status: {}", status).into() );
-                //web_sys::console::log_1(&format!("Raw response: {:?}", val).into());
 
                 if let Some(val) = val {
                     match serde_json::from_value::<DataResponse>(val) {
@@ -172,10 +180,9 @@ impl DataWindow {
                 web_sys::console::log_1( &format!("Data fetch failed. Status: {}", status).into());
             }
         });
-
-        
     }
 
+    /// Function to format the JSON response and insert it into table data
     pub fn format_data(&mut self) {
         self.table_data.clear();
 
@@ -206,6 +213,7 @@ impl DataWindow {
             };
         }
 
+        // Handle asc/desc
         if self.direction == false {
             self.table_data.reverse();
         }
@@ -213,15 +221,26 @@ impl DataWindow {
 
     /// Draw the data window
     pub fn draw(&mut self, ctx: &eframe::egui::Context, ) -> () {
+
+        // Get current time from window
+        let current_time = match window() {
+            Some(w) => match w.performance() {
+                Some(p) => p.now(),
+                None => 0.0,
+            },
+            None => 0.0,
+        };
+
         let current_session_string = unsafe { (*self.current_session).clone() };
 
-        if current_session_string != self.prev_session {
-            self.prev_session = current_session_string.clone();
-            self.loaded = false
-        }
-
-        if !self.loaded { 
-            self.load_data(); 
+        // Load data every 1 second OR every time current session changes
+        if current_time - self.last_refresh >= 1000.0 || current_session_string != self.prev_session {
+            if current_session_string != self.prev_session {
+                self.prev_session = current_session_string.clone();
+                self.loaded = false
+            } 
+            self.load_data();
+            self.last_refresh = current_time;
         }
 
         self.format_data(); 
@@ -253,7 +272,7 @@ impl DataWindow {
                 }
             }
         
-            // Dropdown pannel setup
+            // Top bar setup
             Frame::none()
                 .fill(egui::Color32::LIGHT_GRAY)
                 .inner_margin(egui::Margin::symmetric(10.0, 10.0))
@@ -265,6 +284,7 @@ impl DataWindow {
                         ui.set_width(940.0);
                     }
                     
+                    // Dropdown menus
                     ui.horizontal(|ui| {
                         ui.set_width(ui.available_width());
                         ui.label("Theme:");
@@ -324,6 +344,7 @@ impl DataWindow {
                             self.current_page += 1;
                         }
 
+                        // Sort direction
                         if ui.button(&self.direction_text).clicked() {
                             if self.direction_text == "Sort: descending v" {
                                 self.direction_text = "Sort: ascending ^".to_string();
