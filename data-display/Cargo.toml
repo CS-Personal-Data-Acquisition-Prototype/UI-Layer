@@ -13,7 +13,7 @@ log = "0.4.22"
 # serde only required for persistence
 serde = { version = "1.0.217", features = ["derive"] }
 csv = "1.1"
-tcp-client = { path = "path_to_tcp_clent" }
+tcp-client = { path = "../../client-api-lib/tcp-client" }
 serde_json = "1.0.137"
 
 # web:

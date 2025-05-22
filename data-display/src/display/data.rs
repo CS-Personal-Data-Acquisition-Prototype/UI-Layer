@@ -76,7 +76,9 @@ pub enum Theme {
 pub enum Selection {
     SensorData,
     LocData,
-    AccelData
+    AccelData,
+    GyroData,
+    DacData,
 }
 
 /// Display type dropdown
@@ -304,11 +306,15 @@ impl DataWindow {
                                 Selection::SensorData => "All Data",
                                 Selection::LocData => "Location Data",
                                 Selection::AccelData => "Acceleration Data",
+                                Selection::GyroData => "Gyroscopic Data",
+                                Selection::DacData => "Dac Data",
                             })
                             .show_ui(ui, |ui| {
                                 ui.selectable_value(&mut self.dropdown, Selection::SensorData, "All Data");
                                 ui.selectable_value(&mut self.dropdown, Selection::LocData, "Location Data");
                                 ui.selectable_value(&mut self.dropdown, Selection::AccelData, "Acceleration Data");
+                                ui.selectable_value(&mut self.dropdown, Selection::GyroData, "Gyroscopic Data");
+                                ui.selectable_value(&mut self.dropdown, Selection::DacData, "Dac Data");
                             });
                         ui.add_space(20.0);
                         ui.label("Display Type:");
@@ -538,6 +544,155 @@ impl DataWindow {
                                         ui.line(Line::new(accel_x).name("Accel X").color(egui::Color32::RED));
                                         ui.line(Line::new(accel_y).name("Accel Y").color(egui::Color32::GREEN));
                                         ui.line(Line::new(accel_z).name("Accel Z").color(egui::Color32::BLUE));
+                                    });
+                            }    
+                        }
+                        Selection::GyroData => {
+                            if show_table == true {
+                                ui.heading("Sensor Data:");
+                                TableBuilder::new(ui)
+                                    .striped(true)
+                                    .resizable(true)
+                                    .columns(Column::auto(), 5)
+                                    .header(30.0, |mut header| {
+                                        for h in self.table_headers.iter().take(2) {
+                                            header.col(|ui| {
+                                                ui.heading(h);
+                                            });
+                                        }
+                                        for h in self.table_headers.iter().skip(8).take(3) {
+                                            header.col(|ui| {
+                                                ui.heading(h);
+                                            });
+                                        }
+                                    })
+                                    .body(|mut body| {
+                                        let start_row = self.current_page * 10;
+                                        let end_row = (start_row + 10).min(self.table_data.len());
+                                        for r in &self.table_data[start_row..end_row] {
+                                            body.row(20.0, |mut row_ui| {
+                                                row_ui.col(|ui| { ui.label(r.id.to_string()); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.24}", r.timestamp.clone())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_x.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_y.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_z.to_string())); });
+                                            });
+                                        }  
+                                    });
+
+                                ui.add_space(10.0);
+                                let len = self.table_data.len() as f64;
+                                let avg_gyro_x: f64 = self.table_data.iter().map(|row| row.gyro_x).sum::<f64>();
+                                let avg_gyro_y: f64 = self.table_data.iter().map(|row| row.gyro_y).sum::<f64>();
+                                let avg_gyro_z: f64 = self.table_data.iter().map(|row| row.gyro_z).sum::<f64>();
+                                ui.label(format!("Average Gyro in X: {:.4}", avg_gyro_x/len));
+                                ui.label(format!("Average Gyro in Y: {:.4}", avg_gyro_y/len));
+                                ui.label(format!("Average Gyro in Z: {:.4}", avg_gyro_z/len));
+                                ui.separator();  
+                            }
+
+                            // Graph drawing
+                            if show_graph == true {
+                                ui.add_space(10.0);
+                                ui.heading("Sensor Graph:");
+
+                                let gyro_x: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.gyro_x]).collect();
+
+                                let gyro_y: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.gyro_y]).collect();
+
+                                let gyro_z: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.gyro_z]).collect();
+
+                                Plot::new("gyro_graph")
+                                    .legend(Legend::default())
+                                    .x_axis_label("ID")
+                                    .y_axis_label("Gyro")
+                                    .width(800.0)
+                                    .height(300.0)
+                                    .show(ui, |ui| {
+                                        ui.line(Line::new(gyro_x).name("Gyro X").color(egui::Color32::RED));
+                                        ui.line(Line::new(gyro_y).name("Gyro Y").color(egui::Color32::GREEN));
+                                        ui.line(Line::new(gyro_z).name("Gyro Z").color(egui::Color32::BLUE));
+                                    });
+                            }    
+                        }
+                        Selection::DacData => {
+                            if show_table == true {
+                                ui.heading("Sensor Data:");
+                                TableBuilder::new(ui)
+                                    .striped(true)
+                                    .resizable(true)
+                                    .columns(Column::auto(), 6)
+                                    .header(30.0, |mut header| {
+                                        for h in self.table_headers.iter().take(2) {
+                                            header.col(|ui| {
+                                                ui.heading(h);
+                                            });
+                                        }
+                                        for h in self.table_headers.iter().skip(11).take(4) {
+                                            header.col(|ui| {
+                                                ui.heading(h);
+                                            });
+                                        }
+                                    })
+                                    .body(|mut body| {
+                                        let start_row = self.current_page * 10;
+                                        let end_row = (start_row + 10).min(self.table_data.len());
+                                        for r in &self.table_data[start_row..end_row] {
+                                            body.row(20.0, |mut row_ui| {
+                                                row_ui.col(|ui| { ui.label(r.id.to_string()); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.24}", r.timestamp.clone())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_1.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_2.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_3.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_4.to_string())); });
+                                            });
+                                        }  
+                                    });
+
+                                ui.add_space(10.0);
+                                let len = self.table_data.len() as f64;
+                                let avg_dac_1: f64 = self.table_data.iter().map(|row| row.dac_1).sum::<f64>();
+                                let avg_dac_2: f64 = self.table_data.iter().map(|row| row.dac_2).sum::<f64>();
+                                let avg_dac_3: f64 = self.table_data.iter().map(|row| row.dac_3).sum::<f64>();
+                                let avg_dac_4: f64 = self.table_data.iter().map(|row| row.dac_4).sum::<f64>();
+                                ui.label(format!("Average Dac 1: {:.4}", avg_dac_1/len));
+                                ui.label(format!("Average Dac 2: {:.4}", avg_dac_2/len));
+                                ui.label(format!("Average Dac 3: {:.4}", avg_dac_3/len));
+                                ui.label(format!("Average Dac 4: {:.4}", avg_dac_4/len));
+                                ui.separator();  
+                            }
+
+                            // Graph drawing
+                            if show_graph == true {
+                                ui.add_space(10.0);
+                                ui.heading("Sensor Graph:");
+
+                                let dac_1: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.dac_1]).collect();
+
+                                let dac_2: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.dac_2]).collect();
+
+                                let dac_3: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.dac_3]).collect();
+
+                                let dac_4: PlotPoints = self.table_data.iter().enumerate()
+                                    .map(|(i, row)| [(i + 1) as f64, row.dac_4]).collect();
+
+                                Plot::new("dac_graph")
+                                    .legend(Legend::default())
+                                    .x_axis_label("ID")
+                                    .y_axis_label("Dac")
+                                    .width(800.0)
+                                    .height(300.0)
+                                    .show(ui, |ui| {
+                                        ui.line(Line::new(dac_1).name("Accel X").color(egui::Color32::RED));
+                                        ui.line(Line::new(dac_2).name("Accel Y").color(egui::Color32::GREEN));
+                                        ui.line(Line::new(dac_3).name("Accel Z").color(egui::Color32::BLUE));
+                                        ui.line(Line::new(dac_4).name("Accel Z").color(egui::Color32::YELLOW));
                                     });
                             }    
                         }
