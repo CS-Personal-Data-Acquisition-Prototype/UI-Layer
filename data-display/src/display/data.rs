@@ -51,7 +51,7 @@ pub struct Blob {
 
 /// Individual response object 
 #[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Row2 {
     datetime: String,
     id: i64,
@@ -95,17 +95,23 @@ pub struct DataWindow {
     table_headers: Vec<String>,
     table_data: Vec<Row>,
     datapoints: Vec<Row2>,
+
     dropdown: Selection,
     theme_dropdown: Theme,
     display_dropdown: DisplayType,
     fullscreen: bool,
-    loaded: bool,
-    prev_session: String,
-    current_session: *mut String,
     current_page: usize,
     direction: bool,
     direction_text: String,
+
+    loaded: bool,
+    formatted: bool,
+    prev_session: String,
+    current_session: *mut String,
     last_refresh: f64,
+    last_row: usize,
+    last_datetime: Option<String>,
+    first_fetch: bool,
 }
 
 impl DataWindow {
@@ -135,64 +141,139 @@ impl DataWindow {
             table_headers: headers,
             table_data: Vec::new(),
             datapoints: Vec::new(),
+
             dropdown: Selection::AccelData,
             theme_dropdown: Theme::DarkMode,
             display_dropdown: DisplayType::Table,
             fullscreen: false,
-            loaded: false,
-            prev_session: String::new(),
-            current_session,
             current_page: 0,
             direction: false,
             direction_text: "Sort: ascending v".to_string(),
+
+            loaded: false,
+            formatted: false,
+            prev_session: String::new(),
+            current_session,
             last_refresh: 0.0,
+            last_row: 0,
+            last_datetime: None,
+            first_fetch: true,
         }
     }
 
     /// Function to issue request and handle response from tcp server
     pub fn load_data(&mut self) {
-        self.loaded = true;
-
         let current_session_string = unsafe { (*self.current_session).clone() };
 
+        // Clear flags and saved values for new session
+        if current_session_string != self.prev_session {
+            self.prev_session = current_session_string.clone();
+            self.loaded = false;
+            self.first_fetch = true;
+            self.last_datetime = None; 
+            self.last_row = 0;   
+            self.datapoints.clear();  
+            self.table_data.clear(); 
+        }
+    
+        self.loaded = true; 
+
+        let current_datetime_string = self.last_datetime.clone().unwrap_or("2025-01-01T00:00:00.000".to_string());
+    
+        // Used to get data out of async blocks 
+        let formatted_ptr: *mut bool = &mut self.formatted;
         let data_ptr: *mut Vec<Row2> = &mut self.datapoints;
-
+        let last_datetime_ptr: *mut Option<String> = &mut self.last_datetime;
+    
         let client = client::get_client();
-
-        wasm_bindgen_futures::spawn_local(async move {
-            let (status, val) = session_sensor_data::view_datapoints_by_session_id(&client, &current_session_string).await;
-            
-            if status == 200 {
-                web_sys::console::log_1( &format!("Data loaded. Status: {}", status).into() );
-
-                if let Some(val) = val {
-                    match serde_json::from_value::<DataResponse>(val) {
-                        Ok(parsed) => {
-                            unsafe {
-                                *data_ptr = parsed.datapoints;
+    
+        // Only runs on the first fetch when loading a session
+        if self.first_fetch {
+            wasm_bindgen_futures::spawn_local(async move {
+                let (status, val) =
+                    session_sensor_data::view_datapoints_by_session_id(&client, &current_session_string).await;
+    
+                if status == 200 {
+                    web_sys::console::log_1(&format!("First data loaded. Status: {}", status).into());
+    
+                    if let Some(val) = val {
+                        match serde_json::from_value::<DataResponse>(val) {
+                            Ok(parsed) => {
+                                let datapoints = parsed.datapoints;
+                                let last_datetiime = datapoints.last().map(|row| row.datetime.clone());
+                                unsafe {
+                                    *data_ptr = datapoints;
+                                    *last_datetime_ptr = last_datetiime;
+                                    *formatted_ptr = true;
+                                }
+                            }
+                            Err(e) => {
+                                web_sys::console::log_1(&format!("Failed to parse data response: {}", e).into(),);
                             }
                         }
-                        Err(e) => {
-                            web_sys::console::log_1(&format!("Failed to parse data response: {}", e).into());
+                    }
+                } else {
+                    web_sys::console::log_1( &format!("Data fetch failed. Status: {}", status).into());
+                }
+            });
+        } 
+
+        // Refreshes to fetch new data
+        else {
+            wasm_bindgen_futures::spawn_local(async move {
+                let (status, val) = session_sensor_data::view_all_datapoints_by_id_datetime(&client, &current_session_string, &current_datetime_string,).await;
+            
+                if status == 200 {
+                    web_sys::console::log_1(&format!("Data loaded. Status: {}", status).into());
+            
+                    if let Some(val) = val {
+                        match serde_json::from_value::<DataResponse>(val) {
+                            Ok(parsed) => {
+                                let new_datapoints = parsed.datapoints;
+                                unsafe {
+                                    (*data_ptr).extend(new_datapoints);
+                                    *last_datetime_ptr = (*data_ptr).last().map(|row| row.datetime.clone());
+                                    *formatted_ptr = true;
+                                }
+                            }
+                            Err(e) => {
+                                web_sys::console::log_1(&format!("Failed to parse data response: {}", e).into());
+                            }
                         }
                     }
+                } else {
+                    web_sys::console::log_1(&format!("Data fetch failed. Status: {}", status).into());
                 }
-                
-            } else {
-                web_sys::console::log_1( &format!("Data fetch failed. Status: {}", status).into());
-            }
-        });
+            });
+        }
+    
+        self.first_fetch = false;
     }
 
     /// Function to format the JSON response and insert it into table data
     pub fn format_data(&mut self) {
-        self.table_data.clear();
+        web_sys::console::log_1(&format!("Formatting").into());
 
-        for (i, row) in self.datapoints.iter().enumerate() {
+        // Make sure not to break if datapoints get removed
+        if self.last_row > self.datapoints.len() {
+            self.last_row = 0;
+            self.table_data.clear();
+        }
+
+        // Only gather new datapoints to format 
+        let new_datapoints = &self.datapoints[self.last_row..];
+
+        // Change to ascending for insertion
+        if self.direction == false {
+            self.table_data.reverse();
+        }
+
+        // Iterate over new datapoints as Blobs and push to table data
+        for (i, row) in new_datapoints.iter().enumerate() {
             match serde_json::from_value::<Blob>(row.data_blob.clone()) {
                 Ok(parsed) => {
                     self.table_data.push(Row {
-                        id: i as u32,
+                        id: (self.last_row + i) as u32,         // Used for readability since the actual id will always be the same
                         timestamp: row.datetime.clone(),
                         latitude: parsed.lat,
                         longitude: parsed.lon,
@@ -215,7 +296,10 @@ impl DataWindow {
             };
         }
 
-        // Handle asc/desc
+        // Save last row for performance
+        self.last_row = self.datapoints.len();
+
+        // Change back 
         if self.direction == false {
             self.table_data.reverse();
         }
@@ -233,20 +317,19 @@ impl DataWindow {
             None => 0.0,
         };
 
-        let current_session_string = unsafe { (*self.current_session).clone() };
-
         // Load data every 1 second OR every time current session changes
-        if current_time - self.last_refresh >= 1000.0 || current_session_string != self.prev_session {
-            if current_session_string != self.prev_session {
-                self.prev_session = current_session_string.clone();
-                self.loaded = false
-            } 
+        if current_time - self.last_refresh >= 1000.0 || !self.loaded {
             self.load_data();
             self.last_refresh = current_time;
         }
 
-        self.format_data(); 
-        ctx.request_repaint(); 
+        // Format data if unformatted
+        if self.formatted {
+            self.format_data();
+            self.formatted = false;
+        }
+
+        ctx.request_repaint();
 
         eframe::egui::Window::new("Data Window")
         .resizable(true)
@@ -352,15 +435,16 @@ impl DataWindow {
 
                         // Sort direction
                         if ui.button(&self.direction_text).clicked() {
+                            self.direction = !self.direction;
+                            
                             if self.direction_text == "Sort: descending v" {
                                 self.direction_text = "Sort: ascending ^".to_string();
-                                self.direction = !self.direction;
                             }
                             else {
                                 self.direction_text = "Sort: descending v".to_string();
-                                self.direction = !self.direction;
                             }
                             
+                            self.table_data.reverse();
                         }
                     });
                 });
@@ -429,17 +513,17 @@ impl DataWindow {
                                                 row_ui.col(|ui| { ui.label(format!("{:.24}",r.timestamp.clone())); });
                                                 row_ui.col(|ui| { ui.label(r.latitude.to_string()); });
                                                 row_ui.col(|ui| { ui.label(r.longitude.to_string()); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.altitude.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_x.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.accel_y.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.accel_z.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_x.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_y.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_z.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_1.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_2.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_3.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_4.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.altitude)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_x)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.accel_y)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.accel_z)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_x)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_y)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.gyro_z)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_1)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_2)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_3)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.dac_4)); });
                                             });
                                         }  
                                     });
@@ -469,7 +553,7 @@ impl DataWindow {
                                                 row_ui.col(|ui| { ui.label(format!("{:.24}",r.timestamp.clone())); });
                                                 row_ui.col(|ui| { ui.label(r.latitude.to_string()); });
                                                 row_ui.col(|ui| { ui.label(r.longitude.to_string()); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.altitude.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}",r.altitude)); });
                                             });
                                         }  
                                     });
@@ -502,9 +586,9 @@ impl DataWindow {
                                             body.row(20.0, |mut row_ui| {
                                                 row_ui.col(|ui| { ui.label(r.id.to_string()); });
                                                 row_ui.col(|ui| { ui.label(format!("{:.24}", r.timestamp.clone())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_x.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_y.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_z.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_x)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_y)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.accel_z)); });
                                             });
                                         }  
                                     });
@@ -573,9 +657,9 @@ impl DataWindow {
                                             body.row(20.0, |mut row_ui| {
                                                 row_ui.col(|ui| { ui.label(r.id.to_string()); });
                                                 row_ui.col(|ui| { ui.label(format!("{:.24}", r.timestamp.clone())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_x.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_y.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_z.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_x)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_y)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.gyro_z)); });
                                             });
                                         }  
                                     });
@@ -644,10 +728,10 @@ impl DataWindow {
                                             body.row(20.0, |mut row_ui| {
                                                 row_ui.col(|ui| { ui.label(r.id.to_string()); });
                                                 row_ui.col(|ui| { ui.label(format!("{:.24}", r.timestamp.clone())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_1.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_2.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_3.to_string())); });
-                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_4.to_string())); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_1)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_2)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_3)); });
+                                                row_ui.col(|ui| { ui.label(format!("{:.6}", r.dac_4)); });
                                             });
                                         }  
                                     });
@@ -689,10 +773,10 @@ impl DataWindow {
                                     .width(800.0)
                                     .height(300.0)
                                     .show(ui, |ui| {
-                                        ui.line(Line::new(dac_1).name("Accel X").color(egui::Color32::RED));
-                                        ui.line(Line::new(dac_2).name("Accel Y").color(egui::Color32::GREEN));
-                                        ui.line(Line::new(dac_3).name("Accel Z").color(egui::Color32::BLUE));
-                                        ui.line(Line::new(dac_4).name("Accel Z").color(egui::Color32::YELLOW));
+                                        ui.line(Line::new(dac_1).name("Dac 1").color(egui::Color32::RED));
+                                        ui.line(Line::new(dac_2).name("Dac 2").color(egui::Color32::GREEN));
+                                        ui.line(Line::new(dac_3).name("Dac 3").color(egui::Color32::BLUE));
+                                        ui.line(Line::new(dac_4).name("Dac 4").color(egui::Color32::YELLOW));
                                     });
                             }    
                         }
