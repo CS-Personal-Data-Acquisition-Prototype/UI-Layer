@@ -1,8 +1,12 @@
 # UI-Layer
 
-## egui with eframe
+## Overview
+Web application frontend built in Rust with egui/eframe
 
-### Setup
+Official website:
+https://cs-personal-data-acquisition-prototype.github.io/
+
+## Setup
 -  Open terminal in package directory
     - `cd .\data-display`
 
@@ -42,26 +46,91 @@
 
 ---
 ### Building
-- Download and build [client-api-lib](https://github.com/CS-Personal-Data-Acquisition-Prototype/client-api-lib) following relevant instructions
+- Download and build [client-api-lib](https://github.com/CS-Personal-Data-Acquisition-Prototype/client-api-lib) following relevant build instructions
+    - This serves as a static library to allow interfacing with the TCP server
 
 - Return to the data-display folder, open Cargo.toml and replace `"path_to_tcp_clent"` with the path to your tcp-client folder
 
 - Run `cargo build`
 
+<details>
+<summary>Common issues</summary> 
+<ul>
+    <li>Failed to find client-api-lib - make sure the path is correct and client-api-lib is the correct version</li>
+    <li>Trunk issues: see trunk installation section</li>
+</ul>
+</details>
+
+
 ---
 ### Local Testing
 - Download and build [Rust-Tcp](https://github.com/CS-Personal-Data-Acquisition-Prototype/Rust-Tcp), following relevant instructions
 
-- In a separate window with the TCP server open, run `cargo run --features sql`
+- In a separate window with the TCP server file open, run `cargo run --features sql`
 
-- In the data-display window, run `trunk serve` 
-    - This will build the project and host a local server that automatically rebuilds, allowing changes to be seen in realtime. 
+- Return to the data-display window and run `trunk serve` 
+    - This will build the project and host a local server that automatically rebuilds, allowing changes to be seen in realtime
 
 - To build the project without hosting simply run `cargo build` as normal
 
 ---
 ### Production
 Running `trunk build --release` will generate files in a `dist` directory that can be served as static html.
+
+---
+## User Guide
+- Create a new account or login with username and password
+![Login Manager](https://i.imgur.com/CXFz7qD.png)
+
+- Click the New Session button twice to create two new sessions, session 1 for live data and session 2 for historical data
+
+- Click "View" to see the data and select from the options in the display window
+![The window view](https://i.imgur.com/fWnHEOc.png)
+
+- Data can be seen in table or graphical view and sorted by sensor and oldest/newest
+
+- Also allows control of light/dark mode
+
+---
+## Repository Structure
+- /data-display/
+    - /.cargo/
+    - /src/
+        - /display/
+            - account.rs - account window, mostly unimplemented
+            - data.rs - main data window with majority of functionality
+            - device.rs - device window, mostly unimplemented
+            - login.rs - login and authentication control
+            - session.rs - session control
+        - app.rs - deprecated, older single-page UI
+        - display.rs - display manager, draws individual windows and handles data transfer bewteen them
+        - main.rs
+    - /temp_data/
+        - mockdata.csv - deprecated, used for testing older versions
+    - Cargo.toml
+    - datagen.py - deprecated, used for generating mock data
+    - index.html
+    - index.scss
+
+---
+## Developer Guide
+- [Style Guide](https://docs.google.com/document/d/1DvtsMI3C6ymZLcqlgJxwa6pih9ETRJx__Bl2InxUfAk/edit?usp=sharing)
+
+- [API Specification](https://docs.google.com/document/d/1tziVzWEAI0OJFBhgnmJrV8Y4_IoeSf7E4C9q4xEc57g/edit?tab=t.0#heading=h.d1gcyk8hbwpl)
+
+---
+## Future work
+- Implement authentication 
+    - This is currently disabled in the UI as it is not currently implemented in the server, but the infrastructure for it is there
+    - This will allow for the account window to be implemented
+
+- Implement communication pipeline between UI and Pi to allow for feature improvements
+    - Currently only two sessions with hardcoded IDs 1 and 2 are functional, with 1 as the live data channel and 2 as the historical one
+    - This could be accomplished with websockets for direct communication, or through the implementation of new server requests to allow it to act as a middleman
+    - This will allow for:
+        - Start/stop recording button
+        - Device window implementation
+        - Multi-session support
 
 ---
 # License Notice

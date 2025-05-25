@@ -86,7 +86,8 @@ impl LoginDisplay {
             let client = client::get_client();
 
             wasm_bindgen_futures::spawn_local(async move {
-                let (status, _val) = user::create_user(&client, &username, &password,).await;
+                web_sys::console::log_1( &format!("User: {} | Pass: {}", username, password).into() );
+                let (status, _val) = user::create_user(&client, &username, &password).await;
             
                 if status == 201 {
                     web_sys::console::log_1( &format!("Success. Status: {}", status).into() );
