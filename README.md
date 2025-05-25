@@ -6,7 +6,7 @@ Web application frontend built in Rust with egui/eframe
 Official website:
 https://cs-personal-data-acquisition-prototype.github.io/
 
-# Features
+## Features
 - Movable window layout
 - User account and session system
 - Display of real-time data from sensors
