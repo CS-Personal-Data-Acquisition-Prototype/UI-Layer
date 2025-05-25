@@ -6,6 +6,15 @@ Web application frontend built in Rust with egui/eframe
 Official website:
 https://cs-personal-data-acquisition-prototype.github.io/
 
+# Features
+- Movable window layout
+- User account and session system
+- Display of real-time data from sensors
+- Data displayed in table and graphical views
+- Sorted by sensor and oldest/newest
+- Live and historical data
+- Settings for different color modes
+
 ## Setup
 -  Open terminal in package directory
     - `cd .\data-display`
@@ -131,6 +140,8 @@ Running `trunk build --release` will generate files in a `dist` directory that c
         - Start/stop recording button
         - Device window implementation
         - Multi-session support
+- Map view
+    - Allow for visualization of location data through an overlay on a map
 
 ---
 # License Notice
