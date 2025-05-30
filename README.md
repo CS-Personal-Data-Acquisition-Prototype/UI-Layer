@@ -65,8 +65,11 @@ https://cs-personal-data-acquisition-prototype.github.io/
 <details>
 <summary>Common issues</summary> 
 <ul>
-    <li>Failed to find client-api-lib - make sure the path is correct and client-api-lib is the correct version</li>
+    <li>Failed to find client-api-lib: make sure the path is correct and client-api-lib is the correct version
     <li>Trunk issues: see trunk installation section</li>
+    <li>Error: failed to download `mime_guess2 v2.3.1`: install nightly build</li>
+        <pre>rustup install nightly</pre>
+        <pre>rustup override set nightly</pre>
 </ul>
 </details>
 
