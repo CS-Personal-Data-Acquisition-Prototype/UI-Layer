@@ -1,19 +1,21 @@
-# License Notice
-To apply the Apache License to your work, attach the following boilerplate notice. The text should be enclosed in the appropriate comment syntax for the file format. We also recommend that a file or class name and description of purpose be included on the same "printed page" as the copyright notice for easier identification within third-party archives.
-
-    Copyright 2025 CS 462 Personal Data Acquisition Prototype Group
-    
-    Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
-    
-    http://www.apache.org/licenses/LICENSE-2.0
-    Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
-
 # UI-Layer
 
-## egui with eframe
+## Overview
+Web application frontend built in Rust with egui/eframe
 
-### Setup
+Official website:
+https://cs-personal-data-acquisition-prototype.github.io/
+
+## Features
+- Movable window layout
+- User account and session system
+- Display of real-time data from sensors
+- Data displayed in table and graphical views
+- Sorted by sensor and oldest/newest
+- Live and historical data
+- Settings for different color modes
+
+## Setup
 -  Open terminal in package directory
     - `cd .\data-display`
 
@@ -25,35 +27,134 @@ To apply the Apache License to your work, attach the following boilerplate notic
 
 - Install Trunk
     - `cargo install --locked trunk`
-- If trunk installation fails
-    - Open powershell in admin mode
-    - Install chocolatey by executing the following line
-        - `Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))`
-    - Install perl
-        - `choco install strawberryperl`
-    - Install make
-        - `choco install make`
-    - Install specific openssl version
-        - `choco install openssl --version=1.1.1.2100`
-    - Set environment variables
-        - `OPENSSL_DIR="C:\Program Files\OpenSSL-Win64"`
-        - `OPENSSL_INCLUDE_DIR="C:\Program Files\OpenSSL-Win64\include"`
-        - `OPENSSL_LIB_DIR="C:\Program Files\OpenSSL-Win64\lib"`
-        - `OPENSSL_STATIC=1`
-    - Verify environment variables
-        - `ls env:`
-    - Restart IDE and/or terminal to refresh environment variables as needed
-    - Reattempt trunk installation
-        - `cargo install --locked trunk`
-- Download packages and dependencies
-    - `cargo build`
+
+<details>
+<summary>If trunk installation fails</summary> 
+<ul>
+    <li>Open powershell in admin mode</li>
+    <li>Install chocolatey by executing the following line
+        <pre>Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))</pre>
+    <li>Install perl</li>
+        <pre>choco install strawberryperl</pre>
+    <li>Install make</li>
+        <pre>choco install make</pre>
+    <li>Install specific openssl version</li>
+        <pre>choco install openssl --version=1.1.1.2100</pre>
+    <li>Set environment variables</li>
+        <pre>OPENSSL_DIR="C:\Program Files\OpenSSL-Win64"</pre>
+        <pre>OPENSSL_INCLUDE_DIR="C:\Program Files\OpenSSL-Win64\include"</pre>
+        <pre>OPENSSL_LIB_DIR="C:\Program Files\OpenSSL-Win64\lib"</pre>
+        <pre>OPENSSL_STATIC=1</pre>
+    <li>Verify environment variables</li>
+        <pre>ls env:</pre>
+    <li>Restart IDE and/or terminal to refresh environment variables as needed</li>
+    <li>Reattempt trunk installation</li>
+        <pre>cargo install --locked trunk</pre>
+</ul>
+</details>
+
+---
+### Building
+- Download and build [client-api-lib](https://github.com/CS-Personal-Data-Acquisition-Prototype/client-api-lib) following relevant build instructions
+    - This serves as a static library to allow interfacing with the TCP server
+
+- Return to the data-display folder, open Cargo.toml and replace `"path_to_tcp_clent"` with the path to your tcp-client folder
+
+- Run `cargo build`
+
+<details>
+<summary>Common issues</summary> 
+<ul>
+    <li>Failed to find client-api-lib: make sure the path is correct and client-api-lib is the correct version
+    <li>Trunk issues: see trunk installation section</li>
+    <li>Error: failed to download `mime_guess2 v2.3.1`: install nightly build</li>
+        <pre>rustup install nightly</pre>
+        <pre>rustup override set nightly</pre>
+</ul>
+</details>
+
 
 ---
 ### Local Testing
-Running `trunk serve` will build the project and host a local server that automatically rebuilds, allowing changes to be seen in realtime. 
+- Download and build [Rust-Tcp](https://github.com/CS-Personal-Data-Acquisition-Prototype/Rust-Tcp), following relevant instructions
 
-To build the project without hosting simply run `cargo build` as normal
+- In a separate window with the TCP server file open, run `cargo run --features sql`
+
+- Return to the data-display window and run `trunk serve` 
+    - This will build the project and host a local server that automatically rebuilds, allowing changes to be seen in realtime
+
+- To build the project without hosting simply run `cargo build` as normal
 
 ---
 ### Production
 Running `trunk build --release` will generate files in a `dist` directory that can be served as static html.
+
+---
+## User Guide
+- Create a new account or login with username and password
+![Login Manager](https://i.imgur.com/CXFz7qD.png)
+
+- Click the New Session button twice to create two new sessions, session 1 for live data and session 2 for historical data
+
+- Click "View" to see the data and select from the options in the display window
+![The window view](https://i.imgur.com/fWnHEOc.png)
+
+- Data can be seen in table or graphical view and sorted by sensor and oldest/newest
+
+- Also allows control of light/dark mode
+
+---
+## Repository Structure
+- /data-display/
+    - /.cargo/
+    - /src/
+        - /display/
+            - account.rs - account window, mostly unimplemented
+            - data.rs - main data window with majority of functionality
+            - device.rs - device window, mostly unimplemented
+            - login.rs - login and authentication control
+            - session.rs - session control
+        - app.rs - deprecated, older single-page UI
+        - display.rs - display manager, draws individual windows and handles data transfer bewteen them
+        - main.rs
+    - /temp_data/
+        - mockdata.csv - deprecated, used for testing older versions
+    - Cargo.toml
+    - datagen.py - deprecated, used for generating mock data
+    - index.html
+    - index.scss
+
+---
+## Developer Guide
+- [Style Guide](https://docs.google.com/document/d/1DvtsMI3C6ymZLcqlgJxwa6pih9ETRJx__Bl2InxUfAk/edit?usp=sharing)
+
+- [API Specification](https://docs.google.com/document/d/1tziVzWEAI0OJFBhgnmJrV8Y4_IoeSf7E4C9q4xEc57g/edit?tab=t.0#heading=h.d1gcyk8hbwpl)
+
+---
+## Future work
+- Implement authentication 
+    - This is currently disabled in the UI as it is not currently implemented in the server, but the infrastructure for it is there
+    - This will allow for the account window to be implemented
+
+- Implement communication pipeline between UI and Pi to allow for feature improvements
+    - Currently only two sessions with hardcoded IDs 1 and 2 are functional, with 1 as the live data channel and 2 as the historical one
+    - This could be accomplished with websockets for direct communication, or through the implementation of new server requests to allow it to act as a middleman
+    - This will allow for:
+        - Start/stop recording button
+        - Device window implementation
+        - Multi-session support
+- Map view
+    - Allow for visualization of location data through an overlay on a map
+
+---
+# License Notice
+To apply the Apache License to your work, attach the following boilerplate notice. The text should be enclosed in the appropriate comment syntax for the file format. We also recommend that a file or class name and description of purpose be included on the same "printed page" as the copyright notice for easier identification within third-party archives.
+
+    Copyright 2025 CS 462 Personal Data Acquisition Prototype Group
+    
+    Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+    
+    http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+
